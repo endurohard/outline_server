@@ -80,10 +80,13 @@ bot.onText(/\/keys/, async (msg) => {
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
 
+        // Логирование ответа от сервера для отладки
         console.log('Ответ от сервера:', response.data);
 
-        const keys = response.data;
+        // Извлекаем массив ключей из объекта
+        const keys = response.data.accessKeys;
 
+        // Проверка, является ли 'keys' массивом
         if (Array.isArray(keys)) {
             if (keys.length === 0) {
                 bot.sendMessage(chatId, 'Нет доступных ключей.');
@@ -102,3 +105,4 @@ bot.onText(/\/keys/, async (msg) => {
         bot.sendMessage(chatId, 'Произошла ошибка при получении списка ключей.');
     }
 });
+

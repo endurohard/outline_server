@@ -15,7 +15,7 @@ if (!token) {
 const bot = new TelegramBot(token, { polling: true });
 
 // Конфигурация Outline сервера
-const OUTLINE_SERVER = 'https://node1.users.outline.yourvpn.io';
+const OUTLINE_SERVER = process.env.OUTLINE_API_URL; // Используем URL из переменной окружения
 const OUTLINE_API = '/access-keys';
 const OUTLINE_USERS_GATEWAY = 'ssconf://users.outline.yourvpn.io';
 const OUTLINE_SALT = 'qwerty123';
@@ -50,7 +50,6 @@ async function createNewKey(user_id) {
 
 // Функция для генерации динамической ссылки
 function genOutlineDynamicLink(user_id) {
-    // Преобразование user_id в шестнадцатеричную строку
     const hexUserId = user_id.toString(16);
     return `${OUTLINE_USERS_GATEWAY}/conf/${OUTLINE_SALT}${hexUserId}#${CONN_NAME}`;
 }
@@ -76,18 +75,15 @@ bot.onText(/\/keys/, async (msg) => {
     const chatId = msg.chat.id;
 
     try {
-        // Получаем список ключей доступа с сервера Outline
         const response = await axios.get(`${OUTLINE_SERVER}${OUTLINE_API}`, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
 
-        // Проверка, что возвращает сервер
         console.log('Ответ от сервера:', response.data);
 
         const keys = response.data;
 
-        // Проверка, является ли 'keys' массивом
         if (Array.isArray(keys)) {
             if (keys.length === 0) {
                 bot.sendMessage(chatId, 'Нет доступных ключей.');
@@ -99,7 +95,6 @@ bot.onText(/\/keys/, async (msg) => {
                 bot.sendMessage(chatId, keysList);
             }
         } else {
-            // Если ключи не в виде массива, выводим JSON
             bot.sendMessage(chatId, 'Ошибка: Ожидался массив ключей, но получен другой формат.\nОтвет от API:\n' + JSON.stringify(keys, null, 2));
         }
     } catch (error) {

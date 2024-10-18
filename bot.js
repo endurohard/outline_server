@@ -31,23 +31,34 @@ bot.onText(/\/keys/, async (msg) => {
 
     try {
         // Получаем список ключей доступа
-        const response = await axios.get(`${OUTLINE_API_URL}/access-keys`, { httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }) });
+        const response = await axios.get(`${OUTLINE_SERVER}${OUTLINE_API}`, {
+            headers: { 'Content-Type': 'application/json' },
+            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
+        });
+
         const keys = response.data;
 
-        if (keys.length === 0) {
-            bot.sendMessage(chatId, 'Нет доступных ключей.');
+        // Проверка, является ли keys массивом
+        if (Array.isArray(keys)) {
+            if (keys.length === 0) {
+                bot.sendMessage(chatId, 'Нет доступных ключей.');
+            } else {
+                let keysList = 'Список ключей:\n';
+                keys.forEach(key => {
+                    keysList += `ID: ${key.id}, Порт: ${key.port}, URL: ${key.accessUrl}\n`;
+                });
+                bot.sendMessage(chatId, keysList);
+            }
         } else {
-            let keysList = 'Список ключей:\n';
-            keys.forEach(key => {
-                keysList += `ID: ${key.id}, Порт: ${key.port}, URL: ${key.accessUrl}\n`;
-            });
-            bot.sendMessage(chatId, keysList);
+            // Если keys не является массивом, выводим данные как объект
+            bot.sendMessage(chatId, 'Получены данные не в виде массива. Вот что вернул API:\n' + JSON.stringify(keys, null, 2));
         }
     } catch (error) {
-        console.error('Ошибка получения ключей:', error);
+        console.error('Ошибка получения ключей:', error.response ? error.response.data : error.message);
         bot.sendMessage(chatId, 'Произошла ошибка при получении списка ключей.');
     }
 });
+
 
 // Команда для создания нового ключа доступа
 bot.onText(/\/create_key/, async (msg) => {

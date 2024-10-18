@@ -27,7 +27,7 @@ async function createNewKey(user_id) {
         // Шаг 1: Создание ключа
         const createResponse = await axios.post(`${OUTLINE_SERVER}${OUTLINE_API}`, {}, {
             headers: { 'Content-Type': 'application/json' },
-            // Добавьте необходимые заголовки аутентификации, если требуется
+            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }) // Игнорируем ошибки сертификатов
         });
         const key_id = createResponse.data.id;
 
@@ -35,7 +35,7 @@ async function createNewKey(user_id) {
         const keyName = `key_${user_id}`;
         await axios.put(`${OUTLINE_SERVER}${OUTLINE_API}/${key_id}/name`, { name: keyName }, {
             headers: { 'Content-Type': 'application/json' },
-            // Добавьте необходимые заголовки аутентификации, если требуется
+            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }) // Игнорируем ошибки сертификатов
         });
 
         // Шаг 3: Генерация динамической ссылки

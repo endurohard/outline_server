@@ -54,8 +54,8 @@ function genOutlineDynamicLink(user_id) {
     return `${OUTLINE_USERS_GATEWAY}/conf/${OUTLINE_SALT}${hexUserId}#${CONN_NAME}`;
 }
 
-// Обработка команды бота для генерации ключа
-bot.onText(/\/generate_key/, async (msg) => {
+// Обработка команды бота для создания нового ключа
+bot.onText(/\/create_key/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 

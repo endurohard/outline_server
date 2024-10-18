@@ -17,9 +17,9 @@ const bot = new TelegramBot(token, { polling: true });
 // Конфигурация Outline сервера
 const OUTLINE_SERVER = process.env.OUTLINE_API_URL; // Используем URL из переменной окружения
 const OUTLINE_API = '/access-keys';
-const OUTLINE_USERS_GATEWAY = 'ssconf://users.outline.yourvpn.io';
-const OUTLINE_SALT = 'qwerty123';
-const CONN_NAME = 'Wow!';
+const OUTLINE_USERS_GATEWAY = 'ssconf://bestvpn.world';
+const OUTLINE_SALT = '50842';
+const CONN_NAME = 'RaphaelVPN';
 
 // Функция для создания нового ключа Outline
 async function createNewKey(user_id) {

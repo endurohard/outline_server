@@ -6,7 +6,7 @@ const { Client } = require('pg'); // Импортируйте клиент Postg
 
 const token = process.env.TELEGRAM_TOKEN;
 const OUTLINE_SERVER = process.env.OUTLINE_API_URL;
-const adminId = process.env.ADMIN_ID;
+const adminId = process.env.ADMIN_ID; // Убедитесь, что в .env указан ваш ID
 
 if (!token) {
     console.error('Ошибка: TELEGRAM_TOKEN не установлен в .env файле.');
@@ -54,7 +54,8 @@ function showMainKeyboard(chatId) {
         reply_markup: {
             keyboard: [
                 [{ text: 'Старт' }],
-                [{ text: 'Создать ключ' }, { text: 'Список ключей' }]
+                [{ text: 'Создать ключ' }, { text: 'Список ключей' }],
+                [{ text: 'Список пользователей' }] // Добавление кнопки для админа
             ],
             resize_keyboard: true,
             one_time_keyboard: true
@@ -106,8 +107,35 @@ bot.on('message', async (msg) => {
         } else {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
         }
+    } else if (text === 'Список пользователей') {
+        if (isAdmin(chatId)) {
+            await getUsers(chatId);
+        } else {
+            bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
+        }
     }
 });
+
+// Функция для получения списка пользователей из базы данных
+async function getUsers(chatId) {
+    try {
+        const response = await dbClient.query('SELECT telegram_id, username FROM clients');
+        const users = response.rows;
+
+        if (users.length === 0) {
+            bot.sendMessage(chatId, 'Нет записанных пользователей.');
+        } else {
+            let usersList = 'Список пользователей:\n';
+            users.forEach(user => {
+                usersList += `ID: ${user.telegram_id}, Имя: ${user.username || 'не указано'}\n`;
+            });
+            bot.sendMessage(chatId, usersList);
+        }
+    } catch (error) {
+        console.error('Ошибка получения пользователей:', error);
+        bot.sendMessage(chatId, 'Произошла ошибка при получении списка пользователей.');
+    }
+}
 
 // Функция для создания нового ключа Outline
 async function createNewKey(user_id) {

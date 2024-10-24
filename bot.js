@@ -8,6 +8,7 @@ const token = process.env.TELEGRAM_TOKEN;
 const OUTLINE_SERVER = process.env.OUTLINE_API_URL;
 const adminId = process.env.ADMIN_ID; // Убедитесь, что в .env указан ваш ID
 
+
 // Проверка переменных окружения
 if (!token) {
     console.error('Ошибка: TELEGRAM_TOKEN не установлен в .env файле.');

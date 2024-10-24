@@ -79,18 +79,25 @@ bot.on('message', async (msg) => {
 // Функция для создания нового ключа Outline
 async function createNewKey(user_id) {
     try {
+        // Получение текущей даты и времени
+        const currentDate = new Date();
+        const formattedDate = currentDate.toISOString().split('T')[0]; // Формат YYYY-MM-DD
+
+        // Шаг 1: Создание ключа
         const createResponse = await axios.post(`${OUTLINE_SERVER}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
-            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
+            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }) // Игнорируем ошибки сертификатов
         });
         const key_id = createResponse.data.id;
 
-        const keyName = `key_${user_id}`;
+        // Шаг 2: Переименование ключа для привязки к Telegram пользователю (ID пользователя + дата)
+        const keyName = `key_${user_id}_${formattedDate}`; // Используем ID пользователя и дату в качестве имени ключа
         await axios.put(`${OUTLINE_SERVER}/access-keys/${key_id}/name`, { name: keyName }, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
 
+        // Шаг 3: Генерация динамической ссылки
         return genOutlineDynamicLink(user_id);
     } catch (error) {
         console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);

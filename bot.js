@@ -3,10 +3,9 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 
-// Получение токена и настроек из переменных окружения
 const token = process.env.TELEGRAM_TOKEN;
 const OUTLINE_SERVER = process.env.OUTLINE_API_URL;
-const adminId = process.env.ADMIN_ID; // Убедитесь, что в .env указан ваш ID
+const adminId = process.env.ADMIN_ID;
 
 if (!token) {
     console.error('Ошибка: TELEGRAM_TOKEN не установлен в .env файле.');
@@ -44,13 +43,8 @@ function showMainKeyboard(chatId) {
 // Обработчик команды /start
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
-    showMainKeyboard(chatId); // Отправляем клавиатуру при старте
+    showMainKeyboard(chatId);
 });
-
-// Проверка на администратора
-function isAdmin(chatId) {
-    return chatId.toString() === adminId;
-}
 
 // Обработка нажатия кнопки "Старт"
 bot.on('message', async (msg) => {
@@ -61,19 +55,15 @@ bot.on('message', async (msg) => {
         bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');
         showMainKeyboard(chatId);
     } else if (text === 'Создать ключ') {
-        if (isAdmin(chatId)) { // Проверка на админа
-            const userId = msg.from.id;
-            const dynamicLink = await createNewKey(userId);
-            if (dynamicLink) {
-                bot.sendMessage(chatId, `Ваша динамическая ссылка: ${dynamicLink}`);
-            } else {
-                bot.sendMessage(chatId, `Извините, что-то пошло не так.`);
-            }
+        const userId = msg.from.id; // Получаем ID пользователя
+        const dynamicLink = await createNewKey(userId);
+        if (dynamicLink) {
+            bot.sendMessage(chatId, `Ваша динамическая ссылка: ${dynamicLink}`);
         } else {
-            bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
+            bot.sendMessage(chatId, `Извините, что-то пошло не так.`);
         }
     } else if (text === 'Список ключей') {
-        if (isAdmin(chatId)) { // Проверка на админа
+        if (isAdmin(chatId)) {
             await getKeys(chatId);
         } else {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
@@ -84,18 +74,21 @@ bot.on('message', async (msg) => {
 // Функция для создания нового ключа Outline
 async function createNewKey(user_id) {
     try {
+        // Шаг 1: Создание ключа
         const createResponse = await axios.post(`${OUTLINE_SERVER}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
         const key_id = createResponse.data.id;
 
-        const keyName = `key_${user_id}`;
+        // Шаг 2: Переименование ключа для привязки к Telegram пользователю (ID пользователя)
+        const keyName = `key_${user_id}`; // Используем ID пользователя в качестве имени ключа
         await axios.put(`${OUTLINE_SERVER}/access-keys/${key_id}/name`, { name: keyName }, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
 
+        // Шаг 3: Генерация динамической ссылки
         return genOutlineDynamicLink(user_id);
     } catch (error) {
         console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);

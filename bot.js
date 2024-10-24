@@ -5,7 +5,7 @@ const axios = require('axios');
 
 const token = process.env.TELEGRAM_TOKEN;
 const OUTLINE_SERVER = process.env.OUTLINE_API_URL;
-const adminId = process.env.ADMIN_ID;
+const adminId = process.env.ADMIN_ID; // Убедитесь, что в .env указан ваш ID
 
 if (!token) {
     console.error('Ошибка: TELEGRAM_TOKEN не установлен в .env файле.');
@@ -23,6 +23,11 @@ if (!adminId) {
 }
 
 const bot = new TelegramBot(token, { polling: true });
+
+// Функция для проверки, является ли пользователь администратором
+function isAdmin(chatId) {
+    return chatId.toString() === adminId;
+}
 
 // Функция для отображения клавиатуры с кнопками
 function showMainKeyboard(chatId) {
@@ -55,7 +60,7 @@ bot.on('message', async (msg) => {
         bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');
         showMainKeyboard(chatId);
     } else if (text === 'Создать ключ') {
-        const userId = msg.from.id; // Получаем ID пользователя
+        const userId = msg.from.id;
         const dynamicLink = await createNewKey(userId);
         if (dynamicLink) {
             bot.sendMessage(chatId, `Ваша динамическая ссылка: ${dynamicLink}`);
@@ -63,7 +68,7 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, `Извините, что-то пошло не так.`);
         }
     } else if (text === 'Список ключей') {
-        if (isAdmin(chatId)) {
+        if (isAdmin(chatId)) { // Проверка на админа
             await getKeys(chatId);
         } else {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
@@ -89,30 +94,9 @@ async function createNewKey(user_id) {
         return genOutlineDynamicLink(user_id);
     } catch (error) {
         console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
-        return null; // Завершить функцию при ошибке
+        return null;
     }
 }
-
-// Обработка нажатия кнопки "Создать ключ"
-bot.on('message', async (msg) => {
-    const chatId = msg.chat.id;
-    const text = msg.text;
-
-    if (text === 'Создать ключ') {
-        const userId = msg.from.id;
-        try {
-            const dynamicLink = await createNewKey(userId);
-            if (dynamicLink) {
-                bot.sendMessage(chatId, `Ваша динамическая ссылка: ${dynamicLink}`);
-            } else {
-                bot.sendMessage(chatId, `Извините, что-то пошло не так.`);
-            }
-        } catch (error) {
-            console.error('Ошибка при создании ключа:', error);
-            bot.sendMessage(chatId, 'Произошла ошибка при создании ключа.');
-        }
-    }
-});
 
 // Функция для генерации динамической ссылки
 function genOutlineDynamicLink(user_id) {
@@ -152,3 +136,5 @@ async function getKeys(chatId) {
 bot.on('polling_error', (error) => {
     console.error('Polling error:', error);
 });
+
+console.log(Бот Запущен...)

@@ -20,59 +20,65 @@ const OUTLINE_USERS_GATEWAY = process.env.OUTLINE_USERS_GATEWAY || 'ssconf://bes
 const OUTLINE_SALT = process.env.OUTLINE_SALT || '50842';
 const CONN_NAME = process.env.CONN_NAME || 'RaphaelVPN';
 
-// Функция для отображения клавиатуры с кнопкой "Старт"
-function showStartKeyboard(chatId) {
+// Функция для отображения клавиатуры с кнопками
+function showMainKeyboard(chatId) {
     const options = {
         reply_markup: {
             keyboard: [
-                [{ text: 'Старт' }]
+                [{ text: 'Старт' }],
+                [{ text: 'Создать ключ' }, { text: 'Список ключей' }]
             ],
             resize_keyboard: true, // Подгонка размера клавиатуры под экран
             one_time_keyboard: true // Клавиатура исчезнет после нажатия
         }
     };
 
-    bot.sendMessage(chatId, 'Нажмите кнопку «Старт» для продолжения:', options);
+    bot.sendMessage(chatId, 'Выберите действие:', options);
 }
 
 // Обработчик команды /start
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
-    showStartKeyboard(chatId); // Отправляем клавиатуру при старте
+    showMainKeyboard(chatId); // Отправляем клавиатуру при старте
 });
 
 // Обработка нажатия кнопки "Старт"
-bot.on('message', (msg) => {
+bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
     if (text === 'Старт') {
         bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');
-        // Здесь вы можете добавить любую другую логику
+        showMainKeyboard(chatId); // Показать главную клавиатуру
+    } else if (text === 'Создать ключ') {
+        const userId = msg.from.id;
+        const dynamicLink = await createNewKey(userId);
+        if (dynamicLink) {
+            bot.sendMessage(chatId, `Ваша динамическая ссылка: ${dynamicLink}`);
+        } else {
+            bot.sendMessage(chatId, `Извините, что-то пошло не так.`);
+        }
+    } else if (text === 'Список ключей') {
+        await getKeys(chatId);
     }
 });
 
 // Функция для создания нового ключа Outline
 async function createNewKey(user_id) {
     try {
-        // Шаг 1: Создание ключа
         const createResponse = await axios.post(`${OUTLINE_SERVER}${OUTLINE_API}`, {}, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }) // Игнорируем ошибки сертификатов
         });
         const key_id = createResponse.data.id;
 
-        // Шаг 2: Переименование ключа для привязки к Telegram пользователю
         const keyName = `key_${user_id}`;
         await axios.put(`${OUTLINE_SERVER}${OUTLINE_API}/${key_id}/name`, { name: keyName }, {
             headers: { 'Content-Type': 'application/json' },
-            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }) // Игнорируем ошибки сертификатов
+            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
 
-        // Шаг 3: Генерация динамической ссылки
-        const dynamicLink = genOutlineDynamicLink(user_id);
-
-        return dynamicLink;
+        return genOutlineDynamicLink(user_id);
     } catch (error) {
         console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
         return null; // Завершить функцию при ошибке
@@ -85,39 +91,16 @@ function genOutlineDynamicLink(user_id) {
     return `${OUTLINE_USERS_GATEWAY}/conf/${OUTLINE_SALT}${hexUserId}#${CONN_NAME}`;
 }
 
-// Обработка команды бота для создания нового ключа
-bot.onText(/\/create_key/, async (msg) => {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-
-    // Генерация нового ключа для пользователя
-    const dynamicLink = await createNewKey(userId);
-
-    // Отправка динамической ссылки пользователю
-    if (dynamicLink) {
-        bot.sendMessage(chatId, `Ваша динамическая ссылка: ${dynamicLink}`);
-    } else {
-        bot.sendMessage(chatId, `Извините, что-то пошло не так.`);
-    }
-});
-
-// Команда для получения списка ключей доступа
-bot.onText(/\/keys/, async (msg) => {
-    const chatId = msg.chat.id;
-
+// Функция для получения списка ключей доступа
+async function getKeys(chatId) {
     try {
         const response = await axios.get(`${OUTLINE_SERVER}${OUTLINE_API}`, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
 
-        // Логирование ответа от сервера для отладки
-        console.log('Ответ от сервера:', response.data);
-
-        // Извлекаем массив ключей из объекта
         const keys = response.data.accessKeys;
 
-        // Проверка, является ли 'keys' массивом
         if (Array.isArray(keys)) {
             if (keys.length === 0) {
                 bot.sendMessage(chatId, 'Нет доступных ключей.');
@@ -135,7 +118,7 @@ bot.onText(/\/keys/, async (msg) => {
         console.error('Ошибка получения ключей:', error.response ? error.response.data : error.message);
         bot.sendMessage(chatId, 'Произошла ошибка при получении списка ключей.');
     }
-});
+}
 
 bot.on('polling_error', (error) => {
     console.error('Polling error:', error);

@@ -8,6 +8,7 @@ const token = process.env.TELEGRAM_TOKEN;
 const OUTLINE_SERVER = process.env.OUTLINE_API_URL;
 const adminId = process.env.ADMIN_ID; // Убедитесь, что в .env указан ваш ID
 
+// Проверка переменных окружения
 if (!token) {
     console.error('Ошибка: TELEGRAM_TOKEN не установлен в .env файле.');
     process.exit(1);
@@ -68,7 +69,9 @@ function showMainKeyboard(chatId) {
 // Функция для записи клиента в базу данных
 async function addClientToDatabase(chatId, username) {
     try {
+        console.log(`Запись клиента: ID = ${chatId}, Имя = ${username}`);
         await dbClient.query('INSERT INTO clients (telegram_id, username) VALUES ($1, $2) ON CONFLICT (telegram_id) DO NOTHING', [chatId, username]);
+        console.log(`Клиент с ID = ${chatId} успешно записан в базу данных.`);
     } catch (error) {
         console.error('Ошибка записи данных в базу:', error);
     }
@@ -90,6 +93,8 @@ bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
+    console.log(`Получено сообщение: ${text} от пользователя ID = ${chatId}`);
+
     if (text === 'Старт') {
         bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');
         showMainKeyboard(chatId);
@@ -108,8 +113,8 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
         }
     } else if (text === 'Список пользователей') {
-        if (isAdmin(chatId)) {
-            await getUsers(chatId);
+        if (isAdmin(chatId)) { // Проверка на админа
+            await getUsers(chatId); // Вызов функции для получения пользователей
         } else {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
         }
@@ -119,6 +124,7 @@ bot.on('message', async (msg) => {
 // Функция для получения списка пользователей из базы данных
 async function getUsers(chatId) {
     try {
+        console.log('Запрос списка пользователей из базы данных...');
         const response = await dbClient.query('SELECT telegram_id, username FROM clients');
         const users = response.rows;
 
@@ -143,6 +149,7 @@ async function createNewKey(user_id) {
         const currentDate = new Date();
         const formattedDate = currentDate.toISOString().split('T')[0]; // Формат YYYY-MM-DD
 
+        console.log(`Создание нового ключа для пользователя ID = ${user_id} с датой = ${formattedDate}`);
         const createResponse = await axios.post(`${OUTLINE_SERVER}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
@@ -171,6 +178,7 @@ function genOutlineDynamicLink(user_id) {
 // Функция для получения списка ключей доступа
 async function getKeys(chatId) {
     try {
+        console.log('Запрос списка ключей из API...');
         const response = await axios.get(`${OUTLINE_SERVER}/access-keys`, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })

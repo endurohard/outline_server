@@ -2,18 +2,28 @@ require('dotenv').config();
 
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
+
+// Получение токена и настроек из переменных окружения
 const token = process.env.TELEGRAM_TOKEN;
 const OUTLINE_SERVER = process.env.OUTLINE_API_URL;
-const admin = process.env.admin_id;
+const adminId = process.env.ADMIN_ID; // Убедитесь, что в .env указан ваш ID
+
 if (!token) {
     console.error('Ошибка: TELEGRAM_TOKEN не установлен в .env файле.');
     process.exit(1);
 }
 
-const bot = new TelegramBot(token, { polling: true });
+if (!OUTLINE_SERVER) {
+    console.error('Ошибка: OUTLINE_API_URL не установлен в .env файле.');
+    process.exit(1);
+}
 
-// ID администратора (замените на свой ID)
-const ADMIN_ID = admin; // Например, '123456789'
+if (!adminId) {
+    console.error('Ошибка: ADMIN_ID не установлен в .env файле.');
+    process.exit(1);
+}
+
+const bot = new TelegramBot(token, { polling: true });
 
 // Функция для отображения клавиатуры с кнопками
 function showMainKeyboard(chatId) {
@@ -54,7 +64,7 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, `Извините, что-то пошло не так.`);
         }
     } else if (text === 'Список ключей') {
-        if (chatId.toString() === ADMIN_ID) { // Проверка на админа
+        if (chatId.toString() === adminId) { // Проверка на админа
             await getKeys(chatId);
         } else {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
@@ -65,14 +75,14 @@ bot.on('message', async (msg) => {
 // Функция для создания нового ключа Outline
 async function createNewKey(user_id) {
     try {
-        const createResponse = await axios.post(`${OUTLINE_SERVER}${OUTLINE_API}`, {}, {
+        const createResponse = await axios.post(`${OUTLINE_SERVER}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
-            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
+            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }) // Игнорируем ошибки сертификатов
         });
         const key_id = createResponse.data.id;
 
         const keyName = `key_${user_id}`;
-        await axios.put(`${OUTLINE_SERVER}${OUTLINE_API}/${key_id}/name`, { name: keyName }, {
+        await axios.put(`${OUTLINE_SERVER}/access-keys/${key_id}/name`, { name: keyName }, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
@@ -87,13 +97,13 @@ async function createNewKey(user_id) {
 // Функция для генерации динамической ссылки
 function genOutlineDynamicLink(user_id) {
     const hexUserId = user_id.toString(16);
-    return `${OUTLINE_USERS_GATEWAY}/conf/${OUTLINE_SALT}${hexUserId}#${CONN_NAME}`;
+    return `${process.env.OUTLINE_USERS_GATEWAY}/conf/${process.env.OUTLINE_SALT}${hexUserId}#${process.env.CONN_NAME}`;
 }
 
 // Функция для получения списка ключей доступа
 async function getKeys(chatId) {
     try {
-        const response = await axios.get(`${OUTLINE_SERVER}${OUTLINE_API}`, {
+        const response = await axios.get(`${OUTLINE_SERVER}/access-keys`, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });

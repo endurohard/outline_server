@@ -21,6 +21,13 @@ const OUTLINE_USERS_GATEWAY = 'ssconf://bestvpn.world';
 const OUTLINE_SALT = '50842';
 const CONN_NAME = 'RaphaelVPN';
 
+//Обработчик команды /start
+bot.onText(/\/start/, (msg) => {
+    console.log('Получена команда /start от пользователя:', msg.from.username);
+    const chatId = msg.chat.id;
+    bot.sendMessage(chatId, 'Привет! Я ваш бот, готов к работе.');
+});
+
 // Функция для создания нового ключа Outline
 async function createNewKey(user_id) {
     try {

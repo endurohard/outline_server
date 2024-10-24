@@ -3,6 +3,7 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const token = process.env.TELEGRAM_TOKEN;
+const OUTLINE_SERVER = process.env.OUTLINE_API_URL;
 const admin = process.env.admin_id;
 if (!token) {
     console.error('Ошибка: TELEGRAM_TOKEN не установлен в .env файле.');

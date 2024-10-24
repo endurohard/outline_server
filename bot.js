@@ -3,14 +3,22 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 
+// Получение токена из переменных окружения
 const token = process.env.TELEGRAM_TOKEN;
 
 if (!token) {
     console.error('Ошибка: TELEGRAM_TOKEN не установлен в .env файле.');
-    process.exit(1);
+    process.exit(1); // Завершение процесса с ошибкой
 }
 
 const bot = new TelegramBot(token, { polling: true });
+
+// Конфигурация Outline сервера
+const OUTLINE_SERVER = process.env.OUTLINE_API_URL; // Используем URL из переменной окружения
+const OUTLINE_API = '/access-keys';
+const OUTLINE_USERS_GATEWAY = process.env.OUTLINE_USERS_GATEWAY || 'ssconf://bestvpn.world';
+const OUTLINE_SALT = process.env.OUTLINE_SALT || '50842';
+const CONN_NAME = process.env.CONN_NAME || 'RaphaelVPN';
 
 // Функция для отображения клавиатуры с кнопкой "Старт"
 function showStartKeyboard(chatId) {
@@ -44,10 +52,6 @@ bot.on('message', (msg) => {
     }
 });
 
-bot.on('polling_error', (error) => {
-    console.error('Polling error:', error);
-});
-
 // Функция для создания нового ключа Outline
 async function createNewKey(user_id) {
     try {
@@ -71,7 +75,7 @@ async function createNewKey(user_id) {
         return dynamicLink;
     } catch (error) {
         console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
-        return null;
+        return null; // Завершить функцию при ошибке
     }
 }
 
@@ -133,3 +137,6 @@ bot.onText(/\/keys/, async (msg) => {
     }
 });
 
+bot.on('polling_error', (error) => {
+    console.error('Polling error:', error);
+});

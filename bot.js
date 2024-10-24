@@ -2,10 +2,11 @@ require('dotenv').config();
 
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
+const { Client } = require('pg'); // Импортируйте клиент PostgreSQL
 
 const token = process.env.TELEGRAM_TOKEN;
 const OUTLINE_SERVER = process.env.OUTLINE_API_URL;
-const adminId = process.env.ADMIN_ID; // Убедитесь, что в .env указан ваш ID
+const adminId = process.env.ADMIN_ID;
 
 if (!token) {
     console.error('Ошибка: TELEGRAM_TOKEN не установлен в .env файле.');
@@ -23,6 +24,24 @@ if (!adminId) {
 }
 
 const bot = new TelegramBot(token, { polling: true });
+
+// Создание клиента PostgreSQL
+const dbClient = new Client({
+    host: 'postgres', // Имя сервиса из docker-compose.yml
+    user: process.env.DB_USER, // Ваше имя пользователя
+    password: process.env.DB_PASSWORD, // Ваш пароль
+    database: process.env.DB_NAME, // Название вашей базы данных
+    port: 5432,
+});
+
+// Подключение к базе данных
+dbClient.connect(err => {
+    if (err) {
+        console.error('Ошибка подключения к PostgreSQL:', err.stack);
+    } else {
+        console.log('Подключение к PostgreSQL успешно!');
+    }
+});
 
 // Функция для проверки, является ли пользователь администратором
 function isAdmin(chatId) {
@@ -45,9 +64,23 @@ function showMainKeyboard(chatId) {
     bot.sendMessage(chatId, 'Выберите действие:', options);
 }
 
+// Функция для записи клиента в базу данных
+async function addClientToDatabase(chatId, username) {
+    try {
+        await dbClient.query('INSERT INTO clients (telegram_id, username) VALUES ($1, $2) ON CONFLICT (telegram_id) DO NOTHING', [chatId, username]);
+    } catch (error) {
+        console.error('Ошибка записи данных в базу:', error);
+    }
+}
+
 // Обработчик команды /start
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
+    const username = msg.from.username || ''; // Получение имени пользователя
+
+    // Запись информации о клиенте в базу данных
+    await addClientToDatabase(chatId, username);
+
     showMainKeyboard(chatId);
 });
 
@@ -79,25 +112,21 @@ bot.on('message', async (msg) => {
 // Функция для создания нового ключа Outline
 async function createNewKey(user_id) {
     try {
-        // Получение текущей даты и времени
         const currentDate = new Date();
         const formattedDate = currentDate.toISOString().split('T')[0]; // Формат YYYY-MM-DD
 
-        // Шаг 1: Создание ключа
         const createResponse = await axios.post(`${OUTLINE_SERVER}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
-            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }) // Игнорируем ошибки сертификатов
+            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
         const key_id = createResponse.data.id;
 
-        // Шаг 2: Переименование ключа для привязки к Telegram пользователю (ID пользователя + дата)
         const keyName = `key_${user_id}_${formattedDate}`; // Используем ID пользователя и дату в качестве имени ключа
         await axios.put(`${OUTLINE_SERVER}/access-keys/${key_id}/name`, { name: keyName }, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
 
-        // Шаг 3: Генерация динамической ссылки
         return genOutlineDynamicLink(user_id);
     } catch (error) {
         console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
@@ -139,7 +168,6 @@ async function getKeys(chatId) {
         bot.sendMessage(chatId, 'Произошла ошибка при получении списка ключей.');
     }
 }
-
 
 bot.on('polling_error', (error) => {
     console.error('Polling error:', error);

@@ -47,6 +47,11 @@ bot.onText(/\/start/, (msg) => {
     showMainKeyboard(chatId); // Отправляем клавиатуру при старте
 });
 
+// Проверка на администратора
+function isAdmin(chatId) {
+    return chatId.toString() === adminId;
+}
+
 // Обработка нажатия кнопки "Старт"
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
@@ -56,15 +61,19 @@ bot.on('message', async (msg) => {
         bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');
         showMainKeyboard(chatId);
     } else if (text === 'Создать ключ') {
-        const userId = msg.from.id;
-        const dynamicLink = await createNewKey(userId);
-        if (dynamicLink) {
-            bot.sendMessage(chatId, `Ваша динамическая ссылка: ${dynamicLink}`);
+        if (isAdmin(chatId)) { // Проверка на админа
+            const userId = msg.from.id;
+            const dynamicLink = await createNewKey(userId);
+            if (dynamicLink) {
+                bot.sendMessage(chatId, `Ваша динамическая ссылка: ${dynamicLink}`);
+            } else {
+                bot.sendMessage(chatId, `Извините, что-то пошло не так.`);
+            }
         } else {
-            bot.sendMessage(chatId, `Извините, что-то пошло не так.`);
+            bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
         }
     } else if (text === 'Список ключей') {
-        if (chatId.toString() === adminId) { // Проверка на админа
+        if (isAdmin(chatId)) { // Проверка на админа
             await getKeys(chatId);
         } else {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
@@ -77,7 +86,7 @@ async function createNewKey(user_id) {
     try {
         const createResponse = await axios.post(`${OUTLINE_SERVER}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
-            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }) // Игнорируем ошибки сертификатов
+            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
         const key_id = createResponse.data.id;
 

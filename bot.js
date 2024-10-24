@@ -2,23 +2,17 @@ require('dotenv').config();
 
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
-
-// Получение токена из переменных окружения
 const token = process.env.TELEGRAM_TOKEN;
-
+const admin = process.env.admin_id;
 if (!token) {
     console.error('Ошибка: TELEGRAM_TOKEN не установлен в .env файле.');
-    process.exit(1); // Завершение процесса с ошибкой
+    process.exit(1);
 }
 
 const bot = new TelegramBot(token, { polling: true });
 
-// Конфигурация Outline сервера
-const OUTLINE_SERVER = process.env.OUTLINE_API_URL; // Используем URL из переменной окружения
-const OUTLINE_API = '/access-keys';
-const OUTLINE_USERS_GATEWAY = process.env.OUTLINE_USERS_GATEWAY || 'ssconf://bestvpn.world';
-const OUTLINE_SALT = process.env.OUTLINE_SALT || '50842';
-const CONN_NAME = process.env.CONN_NAME || 'RaphaelVPN';
+// ID администратора (замените на свой ID)
+const ADMIN_ID = admin; // Например, '123456789'
 
 // Функция для отображения клавиатуры с кнопками
 function showMainKeyboard(chatId) {
@@ -28,8 +22,8 @@ function showMainKeyboard(chatId) {
                 [{ text: 'Старт' }],
                 [{ text: 'Создать ключ' }, { text: 'Список ключей' }]
             ],
-            resize_keyboard: true, // Подгонка размера клавиатуры под экран
-            one_time_keyboard: true // Клавиатура исчезнет после нажатия
+            resize_keyboard: true,
+            one_time_keyboard: true
         }
     };
 
@@ -49,7 +43,7 @@ bot.on('message', async (msg) => {
 
     if (text === 'Старт') {
         bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');
-        showMainKeyboard(chatId); // Показать главную клавиатуру
+        showMainKeyboard(chatId);
     } else if (text === 'Создать ключ') {
         const userId = msg.from.id;
         const dynamicLink = await createNewKey(userId);
@@ -59,7 +53,11 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, `Извините, что-то пошло не так.`);
         }
     } else if (text === 'Список ключей') {
-        await getKeys(chatId);
+        if (chatId.toString() === ADMIN_ID) { // Проверка на админа
+            await getKeys(chatId);
+        } else {
+            bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
+        }
     }
 });
 
@@ -68,7 +66,7 @@ async function createNewKey(user_id) {
     try {
         const createResponse = await axios.post(`${OUTLINE_SERVER}${OUTLINE_API}`, {}, {
             headers: { 'Content-Type': 'application/json' },
-            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }) // Игнорируем ошибки сертификатов
+            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
         const key_id = createResponse.data.id;
 
@@ -81,7 +79,7 @@ async function createNewKey(user_id) {
         return genOutlineDynamicLink(user_id);
     } catch (error) {
         console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
-        return null; // Завершить функцию при ошибке
+        return null;
     }
 }
 

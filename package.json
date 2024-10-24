@@ -2,7 +2,8 @@
   "dependencies": {
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
-    "node-telegram-bot-api": "^0.66.0"
+    "node-telegram-bot-api": "^0.66.0",
+    "pg": "^8.13.1"
   },
   "name": "outline_server",
   "version": "1.0.0",

@@ -74,27 +74,45 @@ bot.on('message', async (msg) => {
 // Функция для создания нового ключа Outline
 async function createNewKey(user_id) {
     try {
-        // Шаг 1: Создание ключа
         const createResponse = await axios.post(`${OUTLINE_SERVER}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
         const key_id = createResponse.data.id;
 
-        // Шаг 2: Переименование ключа для привязки к Telegram пользователю (ID пользователя)
-        const keyName = `key_${user_id}`; // Используем ID пользователя в качестве имени ключа
+        const keyName = `key_${user_id}`;
         await axios.put(`${OUTLINE_SERVER}/access-keys/${key_id}/name`, { name: keyName }, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
 
-        // Шаг 3: Генерация динамической ссылки
         return genOutlineDynamicLink(user_id);
     } catch (error) {
         console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
-        return null;
+        return null; // Завершить функцию при ошибке
     }
 }
+
+// Обработка нажатия кнопки "Создать ключ"
+bot.on('message', async (msg) => {
+    const chatId = msg.chat.id;
+    const text = msg.text;
+
+    if (text === 'Создать ключ') {
+        const userId = msg.from.id;
+        try {
+            const dynamicLink = await createNewKey(userId);
+            if (dynamicLink) {
+                bot.sendMessage(chatId, `Ваша динамическая ссылка: ${dynamicLink}`);
+            } else {
+                bot.sendMessage(chatId, `Извините, что-то пошло не так.`);
+            }
+        } catch (error) {
+            console.error('Ошибка при создании ключа:', error);
+            bot.sendMessage(chatId, 'Произошла ошибка при создании ключа.');
+        }
+    }
+});
 
 // Функция для генерации динамической ссылки
 function genOutlineDynamicLink(user_id) {

@@ -133,8 +133,10 @@ async function getKeys(chatId) {
     }
 }
 
+
 bot.on('polling_error', (error) => {
     console.error('Polling error:', error);
 });
 
-console.log(Бот Запущен...)
+// После определения всех функций и обработчиков
+console.log("Бот Запущен...");

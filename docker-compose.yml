@@ -1,20 +1,12 @@
-version: '3'
-
 services:
-  telegram-bot:
-    depends_on:
-      - postgres
-    build: .
-    container_name: telegram-bot
-    env_file:
-      - .env
-    volumes:
-      - .:/usr/src/app
-    restart: unless-stopped
-
   postgres:
     image: postgres:15
     container_name: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "5434:5432"
     env_file:
@@ -23,9 +15,15 @@ services:
       - /path/to/postgres/data:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
     restart: unless-stopped
-    command: >
-      bash -c "
-      docker-entrypoint.sh postgres &
-      sleep 5 &&
-      psql -U infobot -d infobot -f /docker-entrypoint-initdb.d/init.sql
-      "
+
+  telegram-bot:
+    depends_on:
+      postgres:
+        condition: service_healthy
+    build: .
+    container_name: telegram-bot
+    env_file:
+      - .env
+    volumes:
+      - .:/usr/src/app
+    restart: unless-stopped

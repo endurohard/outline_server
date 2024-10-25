@@ -73,14 +73,12 @@ async function saveClient(userId, userName) {
     } catch (err) {
         console.error(`Ошибка записи клиента с ID = ${userId}:`, err);
     }
-    console.log(`Запись клиента: ID = ${userId}, Имя = ${userName}`);
-    await saveClient(userId, userName);
 }
 
-async function requestNewKey(userId, chatId) {
+async function requestNewKey(userId, chatId, userName) {
     console.log(`Пользователь ID = ${userId} запросил создание нового ключа.`);
     const requestId = Date.now();
-    pendingKeyRequests[requestId] = { userId, chatId };
+    pendingKeyRequests[requestId] = { userId, chatId, userName }; // Сохраняем userName
 
     const options = {
         reply_markup: {
@@ -115,13 +113,19 @@ async function confirmKeyCreation(requestId) {
         console.log("Запрос не найден.");
         return;
     }
-    const { userId, chatId } = request;
+    const { userId, chatId, userName } = request; // Извлекаем userName
 
     try {
         const dynamicLink = await createNewKey(userId);
         if (dynamicLink) {
             bot.sendMessage(chatId, `Ваш ключ: ${dynamicLink}`);
             bot.sendMessage(adminId, `Ключ успешно выдан пользователю с ID = ${userId}.`);
+
+            // Логирование перед записью клиента
+            console.log(`Запись клиента с ID = ${userId} после выдачи ключа.`);
+
+            // Сохранение клиента
+            await saveClient(userId, userName); // Записываем клиента
         }
         delete pendingKeyRequests[requestId];
     } catch (error) {
@@ -242,7 +246,7 @@ bot.on('message', async (msg) => {
         showMainKeyboard(chatId, isAdmin(userId));
         await saveClient(userId, userName);
     } else if (text === 'Создать ключ' || text === 'Запросить ключ') {
-        await requestNewKey(userId, chatId);
+        await requestNewKey(userId, chatId, userName); // Передаем userName
     } else if (text.startsWith('/confirm ')) {
         const requestId = text.split(' ')[1];
         await confirmKeyCreation(requestId);

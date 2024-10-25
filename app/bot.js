@@ -71,27 +71,17 @@ async function createNewKey(userId) {
     try {
         console.log(`Создание нового ключа для пользователя ID = ${userId}`);
 
-        // Ваш код для создания ключа здесь (необходимо дополнить)
+        // Здесь ваш код для создания ключа
 
         const currentDate = new Date();
-        const options = {
-            timeZone: 'Europe/Moscow',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-        };
-        const formattedDate = currentDate.toLocaleString('ru-RU', options);
+        const formattedDate = currentDate.toISOString(); // Используйте ISO формат для даты
 
         // Сохраните ключ, ID пользователя и дату в базу данных
         await db.query('INSERT INTO keys (user_id, creation_date) VALUES ($1, $2)', [userId, formattedDate]);
 
-        console.log(`Ключ для пользователя ID = ${userId} успешно сохранен с датой ${formattedDate}.`);
-        // Вернуть динамическую ссылку или дальнейшая логика
+        // Возврат динамической ссылки или дальнейшая логика
     } catch (error) {
-        console.error('Ошибка при создании нового ключа Outline:', error);
+        console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
         return null;
     }
 }

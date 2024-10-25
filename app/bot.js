@@ -21,7 +21,10 @@ const dbConfig = {
 const db = new Client(dbConfig);
 db.connect()
     .then(() => console.log("Подключение к PostgreSQL успешно!"))
-    .catch(err => console.error("Ошибка подключения к PostgreSQL:", err));
+    .catch(err => {
+        console.error("Ошибка подключения к PostgreSQL:", err);
+        process.exit(1); // Завершение процесса в случае ошибки подключения
+    });
 
 // Проверка на наличие токена и adminId
 if (!token || !adminId) {
@@ -51,36 +54,41 @@ bot.on('message', async (msg) => {
     console.log(`Получено сообщение: "${text}" от пользователя ID = ${userId}, чат ID = ${chatId}`);
 
     // Обработка команд
-    if (text === 'Старт') {
-        bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');
-        showMainKeyboard(bot, chatId, isAdmin(userId));
-        await saveClient(userId, userName);
-    } else if (text === 'Создать ключ' || text === 'Запросить ключ') {
-        await requestNewKey(userId, chatId, userName);
-    } else if (text === 'Список пользователей с ключами') {
-        if (isAdmin(chatId)) {
-            await getUsersWithKeys(chatId);
-        } else {
-            bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
+    try {
+        if (text === 'Старт') {
+            bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');
+            showMainKeyboard(bot, chatId, isAdmin(userId));
+            await saveClient(userId, userName);
+        } else if (text === 'Создать ключ' || text === 'Запросить ключ') {
+            await requestNewKey(userId, chatId, userName);
+        } else if (text === 'Список пользователей с ключами') {
+            if (isAdmin(chatId)) {
+                await getUsersWithKeys(chatId);
+            } else {
+                bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
+            }
+        } else if (text.startsWith('/confirm ')) {
+            const requestId = text.split(' ')[1];
+            await confirmKeyCreation(requestId);
+        } else if (text === 'Список ключей') {
+            if (isAdmin(chatId)) {
+                await getKeysFromDatabase(chatId);
+            } else {
+                bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
+            }
+        } else if (text === 'Список пользователей') {
+            if (isAdmin(chatId)) {
+                await getUsers(chatId);
+            } else {
+                bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
+            }
         }
-    } else if (text.startsWith('/confirm ')) {
-        const requestId = text.split(' ')[1];
-        await confirmKeyCreation(requestId);
-    } else if (text === 'Список ключей') {
-        if (isAdmin(chatId)) {
-            await getKeysFromDatabase(chatId);
-        } else {
-            bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
-        }
-    } else if (text === 'Список пользователей') {
-        if (isAdmin(chatId)) {
-            await getUsers(chatId);
-        } else {
-            bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
-        }
-    }
 
-    showMainKeyboard(bot, chatId, isAdmin(userId));
+        showMainKeyboard(bot, chatId, isAdmin(userId));
+    } catch (error) {
+        console.error("Ошибка обработки сообщения:", error);
+        bot.sendMessage(chatId, "Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже.");
+    }
 });
 
 // Обработка ошибок опроса

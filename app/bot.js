@@ -146,10 +146,11 @@ async function getUsers(chatId) {
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
-    const userName = msg.from.username || msg.from.first_name || "Неизвестный";
-    const text = msg.text;
+    const userName = msg.from.username || msg.from.first_name || "Неизвестный"; // Извлечение имени
 
-    console.log(`Получено сообщение: ${text} от пользователя ID = ${chatId}`);
+    console.log(`Получено сообщение: ${msg.text} от пользователя ID = ${chatId}, Имя = ${userName}`);
+    await saveClient(userId, userName); // Сохранение клиента в базе данных
+
 
     // Сохранение клиента при старте
     if (text === 'Старт') {

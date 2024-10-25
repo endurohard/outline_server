@@ -6,7 +6,7 @@ services:
       - postgres
     build: .
     container_name: telegram-bot
-    env_file:                        # Указание .env файла
+    env_file:
       - .env
     volumes:
       - .:/usr/src/app
@@ -23,6 +23,9 @@ services:
       - /path/to/postgres/data:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
     restart: unless-stopped
-
-volumes:
-  postgres_data:
+    command: >
+      bash -c "
+      docker-entrypoint.sh postgres &
+      sleep 5 &&
+      psql -U infobot -d infobot -f /docker-entrypoint-initdb.d/init.sql
+      "

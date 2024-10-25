@@ -71,7 +71,7 @@ async function createNewKey(userId) {
     try {
         console.log(`Создание нового ключа для пользователя ID = ${userId}`);
 
-        // Ваш код для создания ключа в Outline API
+        // Создание ключа в Outline API
         const createResponse = await axios.post(`${process.env.OUTLINE_API_URL}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
@@ -80,21 +80,21 @@ async function createNewKey(userId) {
         // Логируем полный ответ для отладки
         console.log('Ответ от API при создании ключа:', createResponse.data);
 
-        const keyId = createResponse.data.id; // Если у вас есть ID ключа
-        const outlineKey = createResponse.data.key; // Получите ключ из API, убедитесь, что это поле существует
-        const serverIp = 'bestvpn.world'; // Используем фиксированный IP
-        const port = 54842; // Укажите нужный порт или получите его из API
+        const keyId = createResponse.data.id; // ID ключа
+        const accessUrl = createResponse.data.accessUrl; // Получаем accessUrl из API
+        const serverIp = 'bestvpn.world'; // Заменяем IP на ваш фиксированный
+        const port = createResponse.data.port; // Используем порт из ответа API
 
-        // Проверяем, что outlineKey не undefined
-        if (!outlineKey) {
-            console.error('Ошибка: ключ Outline не был получен из API.');
+        // Проверяем, что accessUrl не undefined
+        if (!accessUrl) {
+            console.error('Ошибка: accessUrl не был получен из API.');
             return null; // Или обработайте ошибку по-другому
         }
 
         // Форматирование динамической ссылки
-        const dynamicLink = `ss://${outlineKey}@${serverIp}:${port}/?outline=1#RaphaelVPN`;
+        const dynamicLink = accessUrl.replace(/@.*?:/, `@${serverIp}:${port}/?outline=1#RaphaelVPN`);
 
-        // Сохраните ключ в базу данных
+        // Сохраните ключ в базу данных с текущей датой
         const currentDate = new Date().toISOString(); // Получение текущей даты
         await db.query('INSERT INTO keys (user_id, key_value, creation_date) VALUES ($1, $2, $3)', [userId, dynamicLink, currentDate]);
 

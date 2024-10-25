@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS clients (
 -- Создание таблицы keys
 CREATE TABLE IF NOT EXISTS keys (
                                     id SERIAL PRIMARY KEY,
-                                    user_id BIGINT NOT NULL,  -- Изменено на BIGINT
+                                    user_id BIGINT NOT NULL,
                                     key_value VARCHAR(255) NOT NULL,
     creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );

@@ -73,6 +73,8 @@ async function saveClient(userId, userName) {
     } catch (err) {
         console.error(`Ошибка записи клиента с ID = ${userId}:`, err);
     }
+    console.log(`Запись клиента: ID = ${userId}, Имя = ${userName}`);
+    await saveClient(userId, userName);
 }
 
 async function requestNewKey(userId, chatId) {

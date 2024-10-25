@@ -38,4 +38,23 @@ async function createNewKey(userId) {
     }
 }
 
-module.exports = { createNewKey };
+async function requestNewKey(userId, chatId, userName) {
+    console.log(`Пользователь ID = ${userId} запросил создание нового ключа.`);
+    const requestId = Date.now();
+    pendingKeyRequests[requestId] = { userId, chatId, userName };
+
+    const options = {
+        reply_markup: {
+            inline_keyboard: [
+                [
+                    { text: 'Подтвердить', callback_data: `confirm_${requestId}` },
+                    { text: 'Отклонить', callback_data: `decline_${requestId}` }
+                ]
+            ]
+        }
+    };
+
+    bot.sendMessage(adminId, `Пользователь с ID = ${userId} запросил создание ключа.\nПодтвердите, чтобы создать ключ.`, options);
+}
+
+module.exports = { createNewKey, requestNewKey }; // Экспортируем обе функции

@@ -3,7 +3,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const { Client } = require('pg'); // Импортируем клиент PostgreSQL
 const { getUsersWithKeys } = require('../functions/adminFunctions');
 const { saveClient } = require('../functions/clientFunctions');
-const { createNewKey } = require('../functions/keyFunctions');
+const { createNewKey, requestNewKey } = require('../functions/keyFunctions'); // Импортируйте обе функции
 const { showMainKeyboard } = require('../functions/utils');
 
 // Получение данных из .env

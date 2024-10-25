@@ -84,11 +84,27 @@ async function createNewKey(userId) {
         });
 
         const dynamicLink = `${process.env.OUTLINE_USERS_GATEWAY}/conf/${process.env.OUTLINE_SALT}${userId.toString(16)}#${process.env.CONN_NAME}`;
+
+        // Сохраняем ключ в базе данных
+        await saveKeyToDatabase(userId, keyId, dynamicLink);
+
         console.log(`Динамическая ссылка для пользователя ID = ${userId}: ${dynamicLink}`);
         return dynamicLink;
     } catch (error) {
         console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
         return null;
+    }
+}
+
+// Функция для сохранения ключа в базе данных
+async function saveKeyToDatabase(userId, keyValue, dynamicLink) {
+    const createdAt = new Date();
+    console.log(`Сохранение ключа для пользователя ID = ${userId} в базу данных.`);
+    try {
+        await db.query('INSERT INTO keys (user_id, key_value, created_at) VALUES ($1, $2, $3)', [userId, dynamicLink, createdAt]);
+        console.log(`Ключ для пользователя ID = ${userId} успешно сохранен в базе данных.`);
+    } catch (err) {
+        console.error(`Ошибка записи ключа для пользователя ID = ${userId}:`, err);
     }
 }
 

@@ -7,8 +7,8 @@ const { Client } = require('pg');
 const token = process.env.TELEGRAM_TOKEN;
 const adminId = process.env.ADMIN_ID;
 const dbConfig = {
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
+    host: process.env.DB_HOST || 'postgres', // Изменено здесь
+    port: process.env.DB_PORT || 5432,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,

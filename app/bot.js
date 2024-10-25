@@ -46,8 +46,8 @@ dbClient.connect(err => {
 });
 
 // Функция для проверки, является ли пользователь администратором
-function isAdmin(chatId) {
-    return chatId.toString() === adminId;
+function isAdmin(userId) {
+    return userId.toString() === adminId; // Приводим userId к строке для корректного сравнения
 }
 
 // Функция для отображения клавиатуры с кнопками

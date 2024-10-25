@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS keys (
                                     id SERIAL PRIMARY KEY,
-                                    user_id INTEGER NOT NULL,
+                                    user_id BIGINT NOT NULL,  -- Изменено на BIGINT
                                     key_value VARCHAR(255) NOT NULL,
     creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );

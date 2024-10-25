@@ -92,7 +92,7 @@ async function createNewKey(userId) {
         }
 
         // Форматирование динамической ссылки
-        const dynamicLink = accessUrl.replace(/@.*?:/, `@${serverIp}:${port}/?outline=1#RaphaelVPN`);
+        const dynamicLink = accessUrl.replace(/@.*?:/, `@${serverIp}:${port}/`) + `?outline=1#RaphaelVPN`;
 
         // Сохраните ключ в базу данных с текущей датой
         const currentDate = new Date().toISOString(); // Получение текущей даты

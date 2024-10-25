@@ -109,7 +109,10 @@ bot.on('callback_query', async (callbackQuery) => {
 
 async function confirmKeyCreation(requestId) {
     const request = pendingKeyRequests[requestId];
-    if (!request) return "Запрос не найден.";
+    if (!request) {
+        console.log("Запрос не найден.");
+        return;
+    }
     const { userId, chatId } = request;
 
     try {
@@ -154,7 +157,14 @@ async function createNewKey(userId) {
 
         const dynamicLink = accessUrl.replace(/@.*?:/, `@${serverIp}:${port}/`) + `#RaphaelVPN`;
 
-        await db.query('INSERT INTO keys (user_id, key_value, creation_date) VALUES ($1, $2, $3)', [userId, dynamicLink, currentDate.toISOString()]);
+        await db.query('INSERT INTO keys (user_id, key_value, creation_date) VALUES ($1, $2, $3)', [userId, dynamicLink, currentDate.toISOString()])
+            .then(() => {
+                console.log(`Ключ для пользователя ID = ${userId} успешно записан в базу данных.`);
+            })
+            .catch(err => {
+                console.error(`Ошибка при вставке ключа для пользователя ID = ${userId}:`, err);
+            });
+
         console.log(`Динамическая ссылка для пользователя ID = ${userId}: ${dynamicLink}`);
         return dynamicLink;
     } catch (error) {
@@ -223,7 +233,7 @@ bot.on('message', async (msg) => {
     const userName = msg.from.username || msg.from.first_name || "Неизвестный";
     const text = msg.text;
 
-    console.log(`Получено сообщение: ${text} от пользователя ID = ${chatId}`);
+    console.log(`Получено сообщение: "${text}" от пользователя ID = ${userId}, чат ID = ${chatId}`);
 
     if (text === 'Старт') {
         bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');

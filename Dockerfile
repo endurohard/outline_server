@@ -2,7 +2,7 @@
 FROM node:18
 
 # Устанавливаем рабочую директорию
-WORKDIR /usr/src/app
+WORKDIR /outline
 
 # Копируем файл package.json и package-lock.json
 COPY package*.json ./
@@ -11,7 +11,7 @@ COPY package*.json ./
 RUN npm install
 
 # Копируем остальные файлы проекта в контейнер
-COPY ./app ./app
+COPY . .
 
 # Команда для запуска бота
 CMD ["node", "app/bot.js"]

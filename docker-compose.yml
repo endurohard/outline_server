@@ -2,6 +2,8 @@ version: '3'
 
 services:
   telegram-bot:
+    depends_on:
+      - postgres
     build: .
     container_name: telegram-bot
     env_file:                        # Указание .env файла

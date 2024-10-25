@@ -87,26 +87,29 @@ async function createNewKey(userId) {
 }
 
 // Получение списка ключей из базы данных
-async function getKeysFromDatabase(chatId) {
-    console.log(`Запрос списка ключей от администратора ID = ${chatId}`);
+async function createNewKey(userId) {
     try {
-        const res = await db.query('SELECT id, user_id, key_value, created_at FROM keys');
-        console.log(`Получено ${res.rows.length} ключей из базы данных.`);
+        console.log(`Создание нового ключа для пользователя ID = ${userId}`);
 
-        let message = 'Список ключей:\n';
+        // Шаг 1: Создание ключа (добавьте здесь свою логику создания ключа)
+        const createResponse = await axios.post(`${process.env.OUTLINE_API_URL}/access-keys`, {}, {
+            headers: { 'Content-Type': 'application/json' },
+            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
+        });
 
-        if (res.rows.length > 0) {
-            res.rows.forEach(row => {
-                message += `ID: ${row.id}, Пользователь ID: ${row.user_id}, Дата: ${row.created_at}, URL: ${row.key_value}\n`;
-            });
-        } else {
-            message = 'Нет зарегистрированных ключей.';
-        }
-        bot.sendMessage(chatId, message);
-        console.log(`Отправка списка ключей администратору ID = ${chatId}`);
-    } catch (err) {
-        console.error('Ошибка получения списка ключей:', err);
-        bot.sendMessage(chatId, 'Произошла ошибка при получении списка ключей.');
+        const keyId = createResponse.data.id; // получаем ID ключа
+        const keyValue = createResponse.data.accessUrl; // получите значение ключа
+        const formattedDate = new Date().toISOString(); // получаем дату в ISO формате
+
+        // Сохраните ключ, ID пользователя и дату в базу данных
+        await db.query('INSERT INTO keys (user_id, key_value, creation_date) VALUES ($1, $2, $3)', [userId, keyValue, formattedDate]);
+
+        const dynamicLink = `${process.env.OUTLINE_USERS_GATEWAY}/conf/${process.env.OUTLINE_SALT}${userId.toString(16)}#${process.env.CONN_NAME}`;
+        console.log(`Динамическая ссылка для пользователя ID = ${userId}: ${dynamicLink}`);
+        return dynamicLink;
+    } catch (error) {
+        console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
+        return null;
     }
 }
 

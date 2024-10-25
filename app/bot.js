@@ -37,18 +37,30 @@ function isAdmin(userId) {
     return userId.toString() === adminId;
 }
 
-function showMainKeyboard(chatId) {
-    const options = {
-        reply_markup: {
-            keyboard: [
-                [{ text: 'Старт' }],
-                [{ text: 'Создать ключ' }, { text: 'Список ключей' }],
-                [{ text: 'Список пользователей' }]
-            ],
-            resize_keyboard: true,
-            one_time_keyboard: true
+// Отображение клавиатуры в зависимости от роли пользователя
+function showMainKeyboard(chatId, isAdminUser) {
+    const options = isAdminUser
+        ? {
+            reply_markup: {
+                keyboard: [
+                    [{ text: 'Старт' }],
+                    [{ text: 'Создать ключ' }, { text: 'Список ключей' }],
+                    [{ text: 'Список пользователей' }]
+                ],
+                resize_keyboard: true,
+                one_time_keyboard: true
+            }
         }
-    };
+        : {
+            reply_markup: {
+                keyboard: [
+                    [{ text: 'Запросить ключ' }]
+                ],
+                resize_keyboard: true,
+                one_time_keyboard: true
+            }
+        };
+
     bot.sendMessage(chatId, 'Выберите действие:', options);
 }
 
@@ -68,8 +80,7 @@ async function saveClient(userId, userName) {
 async function requestNewKey(userId, chatId) {
     console.log(`Пользователь ID = ${userId} запросил создание нового ключа.`);
 
-    // Уведомление администратору
-    const requestId = Date.now(); // Уникальный идентификатор запроса
+    const requestId = Date.now();
     pendingKeyRequests[requestId] = { userId, chatId };
 
     const options = {
@@ -86,7 +97,6 @@ async function requestNewKey(userId, chatId) {
     bot.sendMessage(adminId, `Пользователь с ID = ${userId} запросил создание ключа.\nПодтвердите, чтобы создать ключ.`, options);
 }
 
-// Функция для обработки callback-запросов
 bot.on('callback_query', async (callbackQuery) => {
     const message = callbackQuery.message;
     const userId = callbackQuery.from.id;
@@ -98,12 +108,11 @@ bot.on('callback_query', async (callbackQuery) => {
         bot.answerCallbackQuery(callbackQuery.id, { text: 'Запрос подтвержден.' });
     } else if (data.startsWith('decline_')) {
         const requestId = data.split('_')[1];
-        delete pendingKeyRequests[requestId]; // Удаляем запрос после отклонения
+        delete pendingKeyRequests[requestId];
         bot.answerCallbackQuery(callbackQuery.id, { text: 'Запрос отклонен.' });
     }
 });
 
-// Функция для подтверждения создания ключа
 async function confirmKeyCreation(requestId) {
     const request = pendingKeyRequests[requestId];
 
@@ -118,39 +127,34 @@ async function confirmKeyCreation(requestId) {
             bot.sendMessage(chatId, `Ваш ключ: ${dynamicLink}`);
             bot.sendMessage(adminId, `Ключ успешно выдан пользователю с ID = ${userId}.`);
         }
-        delete pendingKeyRequests[requestId]; // Удаляем запрос после обработки
+        delete pendingKeyRequests[requestId];
     } catch (error) {
         console.error("Ошибка при создании ключа:", error);
         bot.sendMessage(chatId, "Не удалось создать ключ. Попробуйте позже.");
     }
 }
 
-// Создание нового ключа Outline
 async function createNewKey(userId) {
     try {
         console.log(`Создание нового ключа для пользователя ID = ${userId}`);
 
-        // Запрос на создание ключа через API
         const createResponse = await axios.post(`${process.env.OUTLINE_API_URL}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
 
-        const keyId = createResponse.data.id; // ID ключа
-        const accessUrl = createResponse.data.accessUrl; // Получаем accessUrl из API
-        const serverIp = 'bestvpn.world'; // Заменяем IP на ваш фиксированный
-        const port = createResponse.data.port; // Используем порт из ответа API
+        const keyId = createResponse.data.id;
+        const accessUrl = createResponse.data.accessUrl;
+        const serverIp = 'bestvpn.world';
+        const port = createResponse.data.port;
 
-        // Проверяем, что accessUrl не undefined
         if (!accessUrl) {
             console.error('Ошибка: accessUrl не был получен из API.');
             return null;
         }
 
-        // Форматирование динамической ссылки
         const dynamicLink = accessUrl.replace(/@.*?:/, `@${serverIp}:${port}/`) + `#RaphaelVPN`;
 
-        // Сохраните ключ в базу данных с текущей датой
         const currentDate = new Date().toISOString();
         await db.query('INSERT INTO keys (user_id, key_value, creation_date) VALUES ($1, $2, $3)', [userId, dynamicLink, currentDate]);
 
@@ -162,30 +166,25 @@ async function createNewKey(userId) {
     }
 }
 
-// Получение списка ключей из базы данных
 // Функция для отправки длинных сообщений
 async function sendLongMessage(chatId, message) {
-    const MAX_MESSAGE_LENGTH = 4096; // Максимальная длина сообщения
+    const MAX_MESSAGE_LENGTH = 4096;
     let parts = [];
 
-    // Разбиваем сообщение на части
     while (message.length > MAX_MESSAGE_LENGTH) {
         parts.push(message.substring(0, MAX_MESSAGE_LENGTH));
         message = message.substring(MAX_MESSAGE_LENGTH);
     }
 
-    // Добавляем оставшуюся часть
     if (message) {
         parts.push(message);
     }
 
-    // Отправляем каждую часть по отдельности
     for (const part of parts) {
         await bot.sendMessage(chatId, part);
     }
 }
 
-// Получение списка ключей из базы данных
 async function getKeysFromDatabase(chatId) {
     console.log(`Запрос списка ключей от администратора ID = ${chatId}`);
     try {
@@ -202,7 +201,6 @@ async function getKeysFromDatabase(chatId) {
             message = 'Нет зарегистрированных ключей.';
         }
 
-        // Отправляем сообщение с помощью функции sendLongMessage
         await sendLongMessage(chatId, message);
         console.log(`Отправка списка ключей администратору ID = ${chatId}`);
     } catch (err) {
@@ -211,7 +209,6 @@ async function getKeysFromDatabase(chatId) {
     }
 }
 
-// Получение списка пользователей
 async function getUsers(chatId) {
     console.log(`Запрос списка пользователей от пользователя ID = ${chatId}`);
     try {
@@ -247,13 +244,13 @@ bot.on('message', async (msg) => {
 
     if (text === 'Старт') {
         bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');
-        showMainKeyboard(chatId);
+        showMainKeyboard(chatId, isAdmin(userId));
         await saveClient(userId, userName);
-    } else if (text === 'Создать ключ') {
-        await requestNewKey(userId, chatId); // Запрашиваем создание ключа
+    } else if (text === 'Создать ключ' || text === 'Запросить ключ') {
+        await requestNewKey(userId, chatId);
     } else if (text.startsWith('/confirm ')) {
         const requestId = text.split(' ')[1];
-        await confirmKeyCreation(requestId); // Подтверждаем создание ключа
+        await confirmKeyCreation(requestId);
     } else if (text === 'Список ключей') {
         if (isAdmin(chatId)) {
             await getKeysFromDatabase(chatId);
@@ -267,12 +264,7 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
         }
     }
-
-    // Показываем клавиатуру после любого сообщения
-    showMainKeyboard(chatId);
+    showMainKeyboard(chatId, isAdmin(userId));
 });
 
-// Логирование ошибок опроса
-bot.on('polling_error', (error) => {
-    console.error('Ошибка опроса:', error);
-});
+bot.on('polling_error', (error) => console.error('Ошибка опроса:', error));

@@ -72,8 +72,36 @@ async function requestNewKey(userId, chatId) {
     const requestId = Date.now(); // Уникальный идентификатор запроса
     pendingKeyRequests[requestId] = { userId, chatId };
 
-    bot.sendMessage(adminId, `Пользователь с ID = ${userId} запросил создание ключа.\nПодтвердите, чтобы создать ключ. Используйте команду /confirm ${requestId}`);
+    const options = {
+        reply_markup: {
+            inline_keyboard: [
+                [
+                    { text: 'Подтвердить', callback_data: `confirm_${requestId}` },
+                    { text: 'Отклонить', callback_data: `decline_${requestId}` }
+                ]
+            ]
+        }
+    };
+
+    bot.sendMessage(adminId, `Пользователь с ID = ${userId} запросил создание ключа.\nПодтвердите, чтобы создать ключ.`, options);
 }
+
+// Функция для обработки callback-запросов
+bot.on('callback_query', async (callbackQuery) => {
+    const message = callbackQuery.message;
+    const userId = callbackQuery.from.id;
+    const data = callbackQuery.data;
+
+    if (data.startsWith('confirm_')) {
+        const requestId = data.split('_')[1];
+        await confirmKeyCreation(requestId);
+        bot.answerCallbackQuery(callbackQuery.id, { text: 'Запрос подтвержден.' });
+    } else if (data.startsWith('decline_')) {
+        const requestId = data.split('_')[1];
+        delete pendingKeyRequests[requestId]; // Удаляем запрос после отклонения
+        bot.answerCallbackQuery(callbackQuery.id, { text: 'Запрос отклонен.' });
+    }
+});
 
 // Функция для подтверждения создания ключа
 async function confirmKeyCreation(requestId) {

@@ -71,22 +71,36 @@ async function createNewKey(userId) {
     try {
         console.log(`Создание нового ключа для пользователя ID = ${userId}`);
 
-        // Здесь ваш код для создания ключа
+        // Запрос для создания ключа
+        const createResponse = await axios.post(`${process.env.OUTLINE_API_URL}/access-keys`, {}, {
+            headers: { 'Content-Type': 'application/json' },
+            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
+        });
 
-        const currentDate = new Date();
-        const formattedDate = currentDate.toISOString(); // Используйте ISO формат для даты
+        const keyId = createResponse.data.id;
+        const keyName = `key_${userId}_${new Date().toISOString().split('T')[0]}`;
 
-        // Сохраните ключ, ID пользователя и дату в базу данных
-        await db.query('INSERT INTO keys (user_id, creation_date) VALUES ($1, $2)', [userId, formattedDate]);
+        // Переименование ключа
+        await axios.put(`${process.env.OUTLINE_API_URL}/access-keys/${keyId}/name`, { name: keyName }, {
+            headers: { 'Content-Type': 'application/json' },
+            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
+        });
 
-        // Возврат динамической ссылки или дальнейшая логика
+        // Генерация динамической ссылки
+        const dynamicLink = `${process.env.OUTLINE_USERS_GATEWAY}/conf/${process.env.OUTLINE_SALT}${userId.toString(16)}#${process.env.CONN_NAME}`;
+
+        // Сохранение ключа в базу данных
+        const createdAt = new Date(); // Дата создания ключа
+        await db.query('INSERT INTO keys (user_id, key_value, creation_date) VALUES ($1, $2, $3)', [userId, dynamicLink, createdAt]);
+        console.log(`Ключ для пользователя ID = ${userId} успешно сохранен в базе данных.`);
+
+        return dynamicLink; // Возврат динамической ссылки
     } catch (error) {
         console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
         return null;
     }
 }
 
-// Получение списка ключей из базы данных
 // Функция для получения списка ключей из базы данных
 async function getKeysFromDatabase(chatId) {
     console.log(`Запрос списка ключей от администратора ID = ${chatId}`);

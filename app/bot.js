@@ -71,30 +71,26 @@ async function createNewKey(userId) {
     try {
         console.log(`Создание нового ключа для пользователя ID = ${userId}`);
 
-        // Запрос для создания ключа
+        // Ваш код для создания ключа в Outline API
         const createResponse = await axios.post(`${process.env.OUTLINE_API_URL}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
 
         const keyId = createResponse.data.id;
-        const keyName = `key_${userId}_${new Date().toISOString().split('T')[0]}`;
+        const outlineKey = createResponse.data.key; // Получите ключ, если он возвращается API
+        const serverIp = 'bestvpn.world'; // Используем фиксированный IP
+        const port = 54842; // Укажите нужный порт или получите его из API
 
-        // Переименование ключа
-        await axios.put(`${process.env.OUTLINE_API_URL}/access-keys/${keyId}/name`, { name: keyName }, {
-            headers: { 'Content-Type': 'application/json' },
-            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
-        });
+        // Форматирование динамической ссылки
+        const dynamicLink = `ss://${outlineKey}@${serverIp}:${port}/?outline=1#RaphaelVPN`;
 
-        // Генерация динамической ссылки
-        const dynamicLink = `${process.env.OUTLINE_USERS_GATEWAY}/conf/${process.env.OUTLINE_SALT}${userId.toString(16)}#${process.env.CONN_NAME}`;
+        // Сохраните ключ в базу данных
+        const currentDate = new Date().toISOString(); // Получение текущей даты
+        await db.query('INSERT INTO keys (user_id, key_value, creation_date) VALUES ($1, $2, $3)', [userId, dynamicLink, currentDate]);
 
-        // Сохранение ключа в базу данных
-        const createdAt = new Date(); // Дата создания ключа
-        await db.query('INSERT INTO keys (user_id, key_value, creation_date) VALUES ($1, $2, $3)', [userId, dynamicLink, createdAt]);
-        console.log(`Ключ для пользователя ID = ${userId} успешно сохранен в базе данных.`);
-
-        return dynamicLink; // Возврат динамической ссылки
+        console.log(`Динамическая ссылка для пользователя ID = ${userId}: ${dynamicLink}`);
+        return dynamicLink;
     } catch (error) {
         console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
         return null;

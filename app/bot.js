@@ -217,8 +217,6 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
         }
     }
-});
-
     // Показываем клавиатуру после любого сообщения
     showMainKeyboard(chatId);
 });

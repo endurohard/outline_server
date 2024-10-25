@@ -37,7 +37,6 @@ function isAdmin(userId) {
     return userId.toString() === adminId;
 }
 
-// Отображение клавиатуры в зависимости от роли пользователя
 function showMainKeyboard(chatId, isAdminUser) {
     const options = isAdminUser
         ? {
@@ -76,10 +75,8 @@ async function saveClient(userId, userName) {
     }
 }
 
-// Функция для запроса нового ключа
 async function requestNewKey(userId, chatId) {
     console.log(`Пользователь ID = ${userId} запросил создание нового ключа.`);
-
     const requestId = Date.now();
     pendingKeyRequests[requestId] = { userId, chatId };
 
@@ -98,10 +95,7 @@ async function requestNewKey(userId, chatId) {
 }
 
 bot.on('callback_query', async (callbackQuery) => {
-    const message = callbackQuery.message;
-    const userId = callbackQuery.from.id;
     const data = callbackQuery.data;
-
     if (data.startsWith('confirm_')) {
         const requestId = data.split('_')[1];
         await confirmKeyCreation(requestId);
@@ -115,12 +109,9 @@ bot.on('callback_query', async (callbackQuery) => {
 
 async function confirmKeyCreation(requestId) {
     const request = pendingKeyRequests[requestId];
-
-    if (!request) {
-        return "Запрос не найден.";
-    }
-
+    if (!request) return "Запрос не найден.";
     const { userId, chatId } = request;
+
     try {
         const dynamicLink = await createNewKey(userId);
         if (dynamicLink) {
@@ -134,10 +125,10 @@ async function confirmKeyCreation(requestId) {
     }
 }
 
+// Создание нового ключа Outline с добавлением имени
 async function createNewKey(userId) {
     try {
         console.log(`Создание нового ключа для пользователя ID = ${userId}`);
-
         const createResponse = await axios.post(`${process.env.OUTLINE_API_URL}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
@@ -153,11 +144,17 @@ async function createNewKey(userId) {
             return null;
         }
 
+        const currentDate = new Date();
+        const keyName = `User_${userId}_${currentDate.toISOString().slice(0, 10)}`;
+        await axios.put(
+            `${process.env.OUTLINE_API_URL}/access-keys/${keyId}/name`,
+            { name: keyName },
+            { headers: { 'Content-Type': 'application/json' }, httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }) }
+        );
+
         const dynamicLink = accessUrl.replace(/@.*?:/, `@${serverIp}:${port}/`) + `#RaphaelVPN`;
 
-        const currentDate = new Date().toISOString();
-        await db.query('INSERT INTO keys (user_id, key_value, creation_date) VALUES ($1, $2, $3)', [userId, dynamicLink, currentDate]);
-
+        await db.query('INSERT INTO keys (user_id, key_value, creation_date) VALUES ($1, $2, $3)', [userId, dynamicLink, currentDate.toISOString()]);
         console.log(`Динамическая ссылка для пользователя ID = ${userId}: ${dynamicLink}`);
         return dynamicLink;
     } catch (error) {
@@ -170,16 +167,11 @@ async function createNewKey(userId) {
 async function sendLongMessage(chatId, message) {
     const MAX_MESSAGE_LENGTH = 4096;
     let parts = [];
-
     while (message.length > MAX_MESSAGE_LENGTH) {
         parts.push(message.substring(0, MAX_MESSAGE_LENGTH));
         message = message.substring(MAX_MESSAGE_LENGTH);
     }
-
-    if (message) {
-        parts.push(message);
-    }
-
+    if (message) parts.push(message);
     for (const part of parts) {
         await bot.sendMessage(chatId, part);
     }
@@ -189,8 +181,6 @@ async function getKeysFromDatabase(chatId) {
     console.log(`Запрос списка ключей от администратора ID = ${chatId}`);
     try {
         const res = await db.query('SELECT id, user_id, key_value, creation_date FROM keys');
-        console.log(`Получено ${res.rows.length} ключей из базы данных.`);
-
         let message = 'Список ключей:\n';
 
         if (res.rows.length > 0) {
@@ -200,9 +190,7 @@ async function getKeysFromDatabase(chatId) {
         } else {
             message = 'Нет зарегистрированных ключей.';
         }
-
         await sendLongMessage(chatId, message);
-        console.log(`Отправка списка ключей администратору ID = ${chatId}`);
     } catch (err) {
         console.error('Ошибка получения списка ключей:', err);
         bot.sendMessage(chatId, 'Произошла ошибка при получении списка ключей.');
@@ -210,13 +198,9 @@ async function getKeysFromDatabase(chatId) {
 }
 
 async function getUsers(chatId) {
-    console.log(`Запрос списка пользователей от пользователя ID = ${chatId}`);
     try {
         const res = await db.query('SELECT * FROM clients');
-        console.log(`Получено ${res.rows.length} пользователей из базы данных.`);
-
         let message = 'Список пользователей:\n';
-
         if (res.rows.length > 0) {
             res.rows.forEach(row => {
                 message += `ID: ${row.id}, Имя: ${row.name}\n`;
@@ -225,7 +209,6 @@ async function getUsers(chatId) {
             message = 'Нет зарегистрированных пользователей.';
         }
         bot.sendMessage(chatId, message);
-        console.log(`Отправка списка пользователей пользователю ID = ${chatId}`);
     } catch (err) {
         console.error('Ошибка получения списка пользователей:', err);
         bot.sendMessage(chatId, 'Произошла ошибка при получении списка пользователей.');

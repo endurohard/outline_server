@@ -11,7 +11,7 @@ COPY package*.json ./
 RUN npm install
 
 # Копируем остальные файлы проекта в контейнер
-COPY . .
+COPY ./app ./app
 
 # Команда для запуска бота
 CMD ["node", "app/bot.js"]

@@ -46,10 +46,10 @@ function isAdmin(userId) {
 // ==================== Обработчики сообщений ====================
 
 bot.on('message', async (msg) => {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    const userName = msg.from.username || msg.from.first_name || "Неизвестный";
-    const text = msg.text;
+    const chatId = msg.chat.id;  // ID чата
+    const userId = msg.from.id;   // ID пользователя
+    const userName = msg.from.username || msg.from.first_name || "Неизвестный"; // Имя пользователя
+    const text = msg.text;         // Полученный текст сообщения
 
     console.log(`Получено сообщение: "${text}" от пользователя ID = ${userId}, чат ID = ${chatId}`);
 
@@ -60,7 +60,7 @@ bot.on('message', async (msg) => {
             showMainKeyboard(bot, chatId, isAdmin(userId));
             await saveClient(userId, userName);
         } else if (text === 'Создать ключ' || text === 'Запросить ключ') {
-            await requestNewKey(userId, chatId, userName);
+            await requestNewKey(userId, chatId, userName); // Вызов функции запроса нового ключа
         } else if (text === 'Список пользователей с ключами') {
             if (isAdmin(chatId)) {
                 await getUsersWithKeys(chatId);

@@ -7,7 +7,7 @@ const { Client } = require('pg');
 const token = process.env.TELEGRAM_TOKEN;
 const adminId = process.env.ADMIN_ID;
 const dbConfig = {
-    host: process.env.DB_HOST || 'postgres', // Хост базы данных
+    host: process.env.DB_HOST || 'postgres',
     port: process.env.DB_PORT || 5432,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
@@ -65,23 +65,6 @@ async function saveClient(userId, userName) {
 }
 
 async function createNewKey(userId) {
-    // Запись запроса на создание ключа в временное хранилище
-    pendingKeyRequests[userId] = { status: 'pending' };
-
-    // Уведомление администратора о новом запросе
-    bot.sendMessage(adminId, `Пользователь с ID = ${userId} запросил создание ключа. Подтвердите, чтобы создать ключ.`, {
-        reply_markup: {
-            inline_keyboard: [[
-                { text: 'Подтвердить создание ключа', callback_data: `confirm_key_${userId}` }
-            ]]
-        }
-    });
-
-    console.log(`Запрос на создание ключа от пользователя ID = ${userId} ожидает подтверждения.`);
-}
-
-// Подтверждение создания ключа
-async function confirmKeyCreation(userId) {
     try {
         console.log(`Создание нового ключа для пользователя ID = ${userId}`);
 
@@ -101,8 +84,9 @@ async function confirmKeyCreation(userId) {
             return null;
         }
 
+        // Форматирование динамической ссылки
         const dynamicLink = accessUrl.replace(/@.*?:/, `@${serverIp}:${port}/`) + `#RaphaelVPN`;
-        const currentDate = new Date().toISOString();
+        const currentDate = new Date().toISOString(); // Получение текущей даты
         await db.query('INSERT INTO keys (user_id, key_value, creation_date) VALUES ($1, $2, $3)', [userId, dynamicLink, currentDate]);
 
         console.log(`Динамическая ссылка для пользователя ID = ${userId}: ${dynamicLink}`);
@@ -110,6 +94,52 @@ async function confirmKeyCreation(userId) {
     } catch (error) {
         console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
         return null;
+    }
+}
+
+async function getKeysFromDatabase(chatId) {
+    console.log(`Запрос списка ключей от администратора ID = ${chatId}`);
+    try {
+        const res = await db.query('SELECT id, user_id, key_value, creation_date FROM keys'); // Запрос к базе данных для получения ключей
+        console.log(`Получено ${res.rows.length} ключей из базы данных.`);
+
+        let message = 'Список ключей:\n';
+
+        if (res.rows.length > 0) {
+            res.rows.forEach(row => {
+                message += `ID: ${row.id}, Пользователь ID: ${row.user_id}, Дата: ${row.creation_date}, URL: ${row.key_value}\n`;
+            });
+        } else {
+            message = 'Нет зарегистрированных ключей.';
+        }
+        bot.sendMessage(chatId, message);
+        console.log(`Отправка списка ключей администратору ID = ${chatId}`);
+    } catch (err) {
+        console.error('Ошибка получения списка ключей:', err);
+        bot.sendMessage(chatId, 'Произошла ошибка при получении списка ключей.');
+    }
+}
+
+async function getUsers(chatId) {
+    console.log(`Запрос списка пользователей от пользователя ID = ${chatId}`);
+    try {
+        const res = await db.query('SELECT * FROM clients');
+        console.log(`Получено ${res.rows.length} пользователей из базы данных.`);
+
+        let message = 'Список пользователей:\n';
+
+        if (res.rows.length > 0) {
+            res.rows.forEach(row => {
+                message += `ID: ${row.id}, Имя: ${row.name}\n`;
+            });
+        } else {
+            message = 'Нет зарегистрированных пользователей.';
+        }
+        bot.sendMessage(chatId, message);
+        console.log(`Отправка списка пользователей пользователю ID = ${chatId}`);
+    } catch (err) {
+        console.error('Ошибка получения списка пользователей:', err);
+        bot.sendMessage(chatId, 'Произошла ошибка при получении списка пользователей.');
     }
 }
 
@@ -128,7 +158,7 @@ bot.on('message', async (msg) => {
         showMainKeyboard(chatId);
         await saveClient(userId, userName);
     } else if (text === 'Создать ключ') {
-        await createNewKey(userId); // Запрашиваем создание ключа
+        await createNewKey(userId);
         bot.sendMessage(chatId, 'Ваш запрос на создание ключа отправлен администратору на подтверждение.');
     } else if (text === 'Список ключей') {
         if (isAdmin(chatId)) {

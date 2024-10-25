@@ -146,15 +146,14 @@ async function getUsers(chatId) {
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
-    const userName = msg.from.username || msg.from.first_name || "Неизвестный"; // Извлечение имени
+    const userName = msg.from.username || msg.from.first_name || "Неизвестный"; // Получаем имя пользователя
+    const text = msg.text; // Инициализируем переменную text
 
-    console.log(`Получено сообщение: ${msg.text} от пользователя ID = ${chatId}, Имя = ${userName}`);
-    await saveClient(userId, userName); // Сохранение клиента в базе данных
+    console.log(`Получено сообщение: ${text} от пользователя ID = ${chatId}, Имя = ${userName}`);
 
+    await saveClient(userId, userName); // Сохраняем клиента
 
-    // Сохранение клиента при старте
     if (text === 'Старт') {
-        await saveClient(userId, userName);
         bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');
         showMainKeyboard(chatId);
     } else if (text === 'Создать ключ') {

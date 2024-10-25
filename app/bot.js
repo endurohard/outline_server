@@ -108,6 +108,30 @@ async function saveKeyToDatabase(userId, keyValue, dynamicLink) {
     }
 }
 
+// Функция для получения списка ключей из базы данных
+async function getKeysFromDatabase(chatId) {
+    console.log(`Запрос списка ключей от администратора ID = ${chatId}`);
+    try {
+        const res = await db.query('SELECT id, user_id, key_value, created_at FROM keys'); // Запрос к базе данных для получения ключей
+        console.log(`Получено ${res.rows.length} ключей из базы данных.`); // Логируем количество ключей
+
+        let message = 'Список ключей:\n';
+
+        if (res.rows.length > 0) {
+            res.rows.forEach(row => {
+                message += `ID: ${row.id}, Пользователь ID: ${row.user_id}, Дата: ${row.created_at}, URL: ${row.key_value}\n`;
+            });
+        } else {
+            message = 'Нет зарегистрированных ключей.';
+        }
+        bot.sendMessage(chatId, message);
+        console.log(`Отправка списка ключей администратору ID = ${chatId}`);
+    } catch (err) {
+        console.error('Ошибка получения списка ключей:', err);
+        bot.sendMessage(chatId, 'Произошла ошибка при получении списка ключей.');
+    }
+}
+
 // Получение списка ключей
 async function getKeys(chatId) {
     console.log(`Запрос списка ключей от пользователя ID = ${chatId}`);
@@ -158,6 +182,7 @@ async function getUsers(chatId) {
 }
 
 // Обработчик команд
+// Обработчик команд
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
@@ -168,6 +193,7 @@ bot.on('message', async (msg) => {
 
     if (text === 'Старт') {
         bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');
+        showMainKeyboard(chatId);
         await saveClient(userId, userName);
     } else if (text === 'Создать ключ') {
         const dynamicLink = await createNewKey(userId);
@@ -177,18 +203,21 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, 'Извините, что-то пошло не так.');
         }
     } else if (text === 'Список ключей') {
+        console.log(`Проверка на админа для "Список ключей": ${isAdmin(chatId)}`);
         if (isAdmin(chatId)) {
-            await getKeys(chatId);
+            await getKeysFromDatabase(chatId); // Получаем ключи из базы данных
         } else {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
         }
     } else if (text === 'Список пользователей') {
+        console.log(`Проверка на админа для "Список пользователей": ${isAdmin(chatId)}`);
         if (isAdmin(chatId)) {
             await getUsers(chatId);
         } else {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
         }
     }
+});
 
     // Показываем клавиатуру после любого сообщения
     showMainKeyboard(chatId);

@@ -58,7 +58,7 @@ async function saveClient(userId, userName) {
     try {
         const res = await db.query('SELECT id FROM clients WHERE id = $1', [userId]);
         if (res.rows.length === 0) {
-            await db.query('INSERT INTO clients (id, name) VALUES ($1, $2)', [userId, userName]);
+            await db.query('INSERT INTO clients (telegram_id, name) VALUES ($1, $2)', [userId, userName]);
             console.log(`Клиент с ID = ${userId} успешно записан в базу данных.`);
         } else {
             console.log(`Клиент с ID = ${userId} уже существует в базе данных.`);

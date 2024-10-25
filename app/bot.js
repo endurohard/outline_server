@@ -20,13 +20,17 @@ db.connect()
     .then(() => console.log("Подключение к PostgreSQL успешно!"))
     .catch(err => console.error("Ошибка подключения к PostgreSQL:", err));
 
+// Проверка наличия токена и ID администратора
 if (!token || !adminId) {
     console.error('Ошибка: не установлены TELEGRAM_TOKEN или ADMIN_ID в .env файле.');
     process.exit(1);
 }
 
+// Создание экземпляра Telegram-бота
 const bot = new TelegramBot(token, { polling: true });
 console.log("Бот Запущен...");
+
+// ==================== Функции ====================
 
 // Проверка, является ли пользователь администратором
 function isAdmin(userId) {
@@ -71,29 +75,25 @@ async function createNewKey(userId) {
     try {
         console.log(`Создание нового ключа для пользователя ID = ${userId}`);
 
-        // Создание ключа в Outline API
         const createResponse = await axios.post(`${process.env.OUTLINE_API_URL}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
 
-        // Логируем полный ответ для отладки
         console.log('Ответ от API при создании ключа:', createResponse.data);
 
-        const keyId = createResponse.data.id; // ID ключа
-        const accessUrl = createResponse.data.accessUrl; // Получаем accessUrl из API
+        const keyId = createResponse.data.id;
+        const accessUrl = createResponse.data.accessUrl;
         const serverIp = 'bestvpn.world'; // Заменяем IP на ваш фиксированный
-        const port = createResponse.data.port; // Используем порт из ответа API
+        const port = createResponse.data.port;
 
-        // Проверяем, что accessUrl не undefined
         if (!accessUrl) {
             console.error('Ошибка: accessUrl не был получен из API.');
-            return null; // Или обработайте ошибку по-другому
+            return null;
         }
-        // Форматирование динамической ссылки
+
         const dynamicLink = accessUrl.replace(/@.*?:/, `@${serverIp}:${port}/`) + `#RaphaelVPN`;
 
-        // Сохраните ключ в базу данных с текущей датой
         const currentDate = new Date().toISOString(); // Получение текущей даты
         await db.query('INSERT INTO keys (user_id, key_value, creation_date) VALUES ($1, $2, $3)', [userId, dynamicLink, currentDate]);
 
@@ -109,7 +109,7 @@ async function createNewKey(userId) {
 async function getKeysFromDatabase(chatId) {
     console.log(`Запрос списка ключей от администратора ID = ${chatId}`);
     try {
-        const res = await db.query('SELECT id, user_id, key_value, creation_date FROM keys'); // Запрос к базе данных для получения ключей
+        const res = await db.query('SELECT id, user_id, key_value, creation_date FROM keys');
         console.log(`Получено ${res.rows.length} ключей из базы данных.`);
 
         let message = 'Список ключей:\n';
@@ -153,7 +153,8 @@ async function getUsers(chatId) {
     }
 }
 
-// Обработчик команд
+// ==================== Обработчики команд ====================
+
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;

@@ -56,13 +56,12 @@ function showMainKeyboard(chatId) {
 async function saveClient(userId, userName) {
     console.log(`Запись клиента: ID = ${userId}, Имя = ${userName}`);
     try {
-        const res = await db.query('SELECT id FROM clients WHERE id = $1', [userId]);
-        if (res.rows.length === 0) {
-            await db.query('INSERT INTO clients (telegram_id, name) VALUES ($1, $2)', [userId, userName]);
-            console.log(`Клиент с ID = ${userId} успешно записан в базу данных.`);
-        } else {
-            console.log(`Клиент с ID = ${userId} уже существует в базе данных.`);
-        }
+        // Попробуйте вставить пользователя, игнорируя конфликты по уникальному ключу
+        await db.query(
+            'INSERT INTO clients (telegram_id, name) VALUES ($1, $2) ON CONFLICT (telegram_id) DO NOTHING',
+            [userId, userName]
+        );
+        console.log(`Клиент с ID = ${userId} успешно записан в базу данных.`);
     } catch (err) {
         console.error(`Ошибка записи клиента с ID = ${userId}:`, err);
     }

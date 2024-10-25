@@ -1,10 +1,10 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
+const { Client } = require('pg'); // Импортируем клиент PostgreSQL
 const { getUsersWithKeys } = require('../functions/adminFunctions');
 const { saveClient } = require('../functions/clientFunctions');
 const { createNewKey } = require('../functions/keyFunctions');
 const { showMainKeyboard } = require('../functions/utils');
-
 
 // Получение данных из .env
 const token = process.env.TELEGRAM_TOKEN;
@@ -23,6 +23,7 @@ db.connect()
     .then(() => console.log("Подключение к PostgreSQL успешно!"))
     .catch(err => console.error("Ошибка подключения к PostgreSQL:", err));
 
+// Проверка на наличие токена и adminId
 if (!token || !adminId) {
     console.error('Ошибка: не установлены TELEGRAM_TOKEN или ADMIN_ID в .env файле.');
     process.exit(1);
@@ -32,6 +33,12 @@ const bot = new TelegramBot(token, { polling: true });
 console.log("Бот Запущен...");
 
 let pendingKeyRequests = {};
+
+// ==================== Функции ====================
+
+function isAdmin(userId) {
+    return userId.toString() === adminId;
+}
 
 // ==================== Обработчики сообщений ====================
 
@@ -43,6 +50,7 @@ bot.on('message', async (msg) => {
 
     console.log(`Получено сообщение: "${text}" от пользователя ID = ${userId}, чат ID = ${chatId}`);
 
+    // Обработка команд
     if (text === 'Старт') {
         bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');
         showMainKeyboard(bot, chatId, isAdmin(userId));
@@ -74,4 +82,5 @@ bot.on('message', async (msg) => {
     showMainKeyboard(bot, chatId, isAdmin(userId));
 });
 
+// Обработка ошибок опроса
 bot.on('polling_error', (error) => console.error('Ошибка опроса:', error));

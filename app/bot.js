@@ -28,8 +28,8 @@ if (!token || !adminId) {
 const bot = new TelegramBot(token, { polling: true });
 console.log("Бот Запущен...");
 
-// ==================== Хранилище для запросов на создание ключей ====================
-let pendingKeyRequests = {}; // Объект для хранения ожидающих подтверждения запросов
+// Хранилище для запросов на создание ключей
+let pendingKeyRequests = {};
 
 // ==================== Функции ====================
 
@@ -64,18 +64,49 @@ async function saveClient(userId, userName) {
     }
 }
 
+// Функция для запроса нового ключа
+async function requestNewKey(userId, chatId) {
+    console.log(`Пользователь ID = ${userId} запросил создание нового ключа.`);
+
+    // Уведомление администратору
+    const requestId = Date.now(); // Уникальный идентификатор запроса
+    pendingKeyRequests[requestId] = { userId, chatId };
+
+    bot.sendMessage(adminId, `Пользователь с ID = ${userId} запросил создание ключа.\nПодтвердите, чтобы создать ключ. Используйте команду /confirm ${requestId}`);
+}
+
+// Функция для подтверждения создания ключа
+async function confirmKeyCreation(requestId) {
+    const request = pendingKeyRequests[requestId];
+
+    if (!request) {
+        return "Запрос не найден.";
+    }
+
+    const { userId, chatId } = request;
+    try {
+        const dynamicLink = await createNewKey(userId);
+        if (dynamicLink) {
+            bot.sendMessage(chatId, `Ваш ключ: ${dynamicLink}`);
+            bot.sendMessage(adminId, `Ключ успешно выдан пользователю с ID = ${userId}.`);
+        }
+        delete pendingKeyRequests[requestId]; // Удаляем запрос после обработки
+    } catch (error) {
+        console.error("Ошибка при создании ключа:", error);
+        bot.sendMessage(chatId, "Не удалось создать ключ. Попробуйте позже.");
+    }
+}
+
+// Создание нового ключа Outline
 async function createNewKey(userId) {
     try {
         console.log(`Создание нового ключа для пользователя ID = ${userId}`);
 
-        // Создание ключа в Outline API
+        // Запрос на создание ключа через API
         const createResponse = await axios.post(`${process.env.OUTLINE_API_URL}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
-
-        // Логируем полный ответ для отладки
-        console.log('Ответ от API при создании ключа:', createResponse.data);
 
         const keyId = createResponse.data.id; // ID ключа
         const accessUrl = createResponse.data.accessUrl; // Получаем accessUrl из API
@@ -85,19 +116,17 @@ async function createNewKey(userId) {
         // Проверяем, что accessUrl не undefined
         if (!accessUrl) {
             console.error('Ошибка: accessUrl не был получен из API.');
-            return null; // Или обработайте ошибку по-другому
+            return null;
         }
 
         // Форматирование динамической ссылки
         const dynamicLink = accessUrl.replace(/@.*?:/, `@${serverIp}:${port}/`) + `#RaphaelVPN`;
-        const currentDate = new Date().toISOString(); // Получение текущей даты
+
+        // Сохраните ключ в базу данных с текущей датой
+        const currentDate = new Date().toISOString();
         await db.query('INSERT INTO keys (user_id, key_value, creation_date) VALUES ($1, $2, $3)', [userId, dynamicLink, currentDate]);
 
         console.log(`Динамическая ссылка для пользователя ID = ${userId}: ${dynamicLink}`);
-
-        // Уведомление администратору о новом запросе на создание ключа
-        bot.sendMessage(adminId, `Пользователь с ID = ${userId} запросил создание ключа.\nДинамическая ссылка: ${dynamicLink}`);
-
         return dynamicLink;
     } catch (error) {
         console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
@@ -105,6 +134,7 @@ async function createNewKey(userId) {
     }
 }
 
+// Получение списка ключей из базы данных
 async function getKeysFromDatabase(chatId) {
     console.log(`Запрос списка ключей от администратора ID = ${chatId}`);
     try {
@@ -128,6 +158,7 @@ async function getKeysFromDatabase(chatId) {
     }
 }
 
+// Получение списка пользователей
 async function getUsers(chatId) {
     console.log(`Запрос списка пользователей от пользователя ID = ${chatId}`);
     try {
@@ -151,7 +182,7 @@ async function getUsers(chatId) {
     }
 }
 
-// ==================== Обработчики команд ====================
+// ==================== Обработчики сообщений ====================
 
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
@@ -166,12 +197,10 @@ bot.on('message', async (msg) => {
         showMainKeyboard(chatId);
         await saveClient(userId, userName);
     } else if (text === 'Создать ключ') {
-        const dynamicLink = await createNewKey(userId);
-        if (dynamicLink) {
-            bot.sendMessage(chatId, `Ваш запрос на создание ключа отправлен администратору на подтверждение.`);
-        } else {
-            bot.sendMessage(chatId, 'Извините, что-то пошло не так.');
-        }
+        await requestNewKey(userId, chatId); // Запрашиваем создание ключа
+    } else if (text.startsWith('/confirm ')) {
+        const requestId = text.split(' ')[1];
+        await confirmKeyCreation(requestId); // Подтверждаем создание ключа
     } else if (text === 'Список ключей') {
         if (isAdmin(chatId)) {
             await getKeysFromDatabase(chatId);
@@ -185,6 +214,7 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
         }
     }
+
     // Показываем клавиатуру после любого сообщения
     showMainKeyboard(chatId);
 });

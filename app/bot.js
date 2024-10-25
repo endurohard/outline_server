@@ -163,6 +163,29 @@ async function createNewKey(userId) {
 }
 
 // Получение списка ключей из базы данных
+// Функция для отправки длинных сообщений
+async function sendLongMessage(chatId, message) {
+    const MAX_MESSAGE_LENGTH = 4096; // Максимальная длина сообщения
+    let parts = [];
+
+    // Разбиваем сообщение на части
+    while (message.length > MAX_MESSAGE_LENGTH) {
+        parts.push(message.substring(0, MAX_MESSAGE_LENGTH));
+        message = message.substring(MAX_MESSAGE_LENGTH);
+    }
+
+    // Добавляем оставшуюся часть
+    if (message) {
+        parts.push(message);
+    }
+
+    // Отправляем каждую часть по отдельности
+    for (const part of parts) {
+        await bot.sendMessage(chatId, part);
+    }
+}
+
+// Получение списка ключей из базы данных
 async function getKeysFromDatabase(chatId) {
     console.log(`Запрос списка ключей от администратора ID = ${chatId}`);
     try {
@@ -178,7 +201,9 @@ async function getKeysFromDatabase(chatId) {
         } else {
             message = 'Нет зарегистрированных ключей.';
         }
-        bot.sendMessage(chatId, message);
+
+        // Отправляем сообщение с помощью функции sendLongMessage
+        await sendLongMessage(chatId, message);
         console.log(`Отправка списка ключей администратору ID = ${chatId}`);
     } catch (err) {
         console.error('Ошибка получения списка ключей:', err);

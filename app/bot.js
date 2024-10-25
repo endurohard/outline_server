@@ -145,16 +145,14 @@ async function getUsers(chatId) {
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
-    const userName = msg.from.username || msg.from.first_name || "Неизвестный"; // Получаем имя пользователя
-    const text = msg.text; // Инициализируем переменную text
+    const userName = msg.from.username || msg.from.first_name || "Неизвестный";
+    const text = msg.text;
 
-    console.log(`Получено сообщение: ${text} от пользователя ID = ${chatId}, Имя = ${userName}`);
-
-    await saveClient(userId, userName); // Сохраняем клиента
+    console.log(`Получено сообщение: ${text} от пользователя ID = ${chatId}`);
 
     if (text === 'Старт') {
         bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');
-        showMainKeyboard(chatId);
+        await saveClient(userId, userName);
     } else if (text === 'Создать ключ') {
         const dynamicLink = await createNewKey(userId);
         if (dynamicLink) {
@@ -175,6 +173,9 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
         }
     }
+
+    // Показываем клавиатуру после любого сообщения
+    showMainKeyboard(chatId);
 });
 
 // Логирование ошибок опроса

@@ -20,13 +20,11 @@ db.connect()
     .then(() => console.log("Подключение к PostgreSQL успешно!"))
     .catch(err => console.error("Ошибка подключения к PostgreSQL:", err));
 
-// Проверка наличия токена и ID администратора
 if (!token || !adminId) {
     console.error('Ошибка: не установлены TELEGRAM_TOKEN или ADMIN_ID в .env файле.');
     process.exit(1);
 }
 
-// Создание экземпляра Telegram-бота
 const bot = new TelegramBot(token, { polling: true });
 console.log("Бот Запущен...");
 
@@ -71,24 +69,32 @@ async function createNewKey(userId) {
     pendingKeyRequests[userId] = { status: 'pending' };
 
     // Уведомление администратора о новом запросе
-    bot.sendMessage(adminId, `Пользователь с ID = ${userId} запросил создание ключа. Подтвердите, чтобы создать ключ.`);
+    bot.sendMessage(adminId, `Пользователь с ID = ${userId} запросил создание ключа. Подтвердите, чтобы создать ключ.`, {
+        reply_markup: {
+            inline_keyboard: [[
+                { text: 'Подтвердить создание ключа', callback_data: `confirm_key_${userId}` }
+            ]]
+        }
+    });
 
     console.log(`Запрос на создание ключа от пользователя ID = ${userId} ожидает подтверждения.`);
 }
 
+// Подтверждение создания ключа
 async function confirmKeyCreation(userId) {
     try {
         console.log(`Создание нового ключа для пользователя ID = ${userId}`);
 
+        // Создание ключа в Outline API
         const createResponse = await axios.post(`${process.env.OUTLINE_API_URL}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
 
-        const keyId = createResponse.data.id;
-        const accessUrl = createResponse.data.accessUrl;
+        const keyId = createResponse.data.id; // ID ключа
+        const accessUrl = createResponse.data.accessUrl; // Получаем accessUrl из API
         const serverIp = 'bestvpn.world'; // Заменяем IP на ваш фиксированный
-        const port = createResponse.data.port;
+        const port = createResponse.data.port; // Используем порт из ответа API
 
         if (!accessUrl) {
             console.error('Ошибка: accessUrl не был получен из API.');
@@ -124,22 +130,6 @@ bot.on('message', async (msg) => {
     } else if (text === 'Создать ключ') {
         await createNewKey(userId); // Запрашиваем создание ключа
         bot.sendMessage(chatId, 'Ваш запрос на создание ключа отправлен администратору на подтверждение.');
-    } else if (text === 'Подтвердить создание ключа') {
-        if (isAdmin(chatId)) {
-            if (pendingKeyRequests[userId]) {
-                const dynamicLink = await confirmKeyCreation(userId); // Подтверждаем создание ключа
-                if (dynamicLink) {
-                    bot.sendMessage(userId, `Ваш ключ создан: ${dynamicLink}`);
-                } else {
-                    bot.sendMessage(userId, 'Извините, что-то пошло не так при создании ключа.');
-                }
-                delete pendingKeyRequests[userId]; // Удаляем запрос из ожидания
-            } else {
-                bot.sendMessage(chatId, 'Нет ожидающих запросов на создание ключа от этого пользователя.');
-            }
-        } else {
-            bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
-        }
     } else if (text === 'Список ключей') {
         if (isAdmin(chatId)) {
             await getKeysFromDatabase(chatId);
@@ -153,9 +143,25 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
         }
     }
-
     // Показываем клавиатуру после любого сообщения
     showMainKeyboard(chatId);
+});
+
+// Обработка запросов на подтверждение ключа
+bot.on('callback_query', async (callbackQuery) => {
+    const userId = callbackQuery.data.split('_')[2]; // Извлекаем ID пользователя из callback_data
+    const chatId = callbackQuery.from.id; // ID администратора
+
+    if (callbackQuery.data.startsWith('confirm_key_') && isAdmin(chatId)) {
+        const dynamicLink = await confirmKeyCreation(userId);
+        if (dynamicLink) {
+            bot.sendMessage(userId, `Ваш ключ создан: ${dynamicLink}`);
+        } else {
+            bot.sendMessage(userId, 'Извините, что-то пошло не так при создании ключа.');
+        }
+    } else {
+        bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
+    }
 });
 
 // Логирование ошибок опроса

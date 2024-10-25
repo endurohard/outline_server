@@ -7,7 +7,7 @@ const { Client } = require('pg');
 const token = process.env.TELEGRAM_TOKEN;
 const adminId = process.env.ADMIN_ID;
 const dbConfig = {
-    host: process.env.DB_HOST || 'postgres', // Изменено здесь
+    host: process.env.DB_HOST || 'postgres', // Хост базы данных
     port: process.env.DB_PORT || 5432,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
@@ -56,7 +56,6 @@ function showMainKeyboard(chatId) {
 async function saveClient(userId, userName) {
     console.log(`Запись клиента: ID = ${userId}, Имя = ${userName}`);
     try {
-        // Попробуйте вставить пользователя, игнорируя конфликты по уникальному ключу
         await db.query(
             'INSERT INTO clients (telegram_id, name) VALUES ($1, $2) ON CONFLICT (telegram_id) DO NOTHING',
             [userId, userName]
@@ -71,49 +70,38 @@ async function saveClient(userId, userName) {
 async function createNewKey(userId) {
     try {
         console.log(`Создание нового ключа для пользователя ID = ${userId}`);
-        const createResponse = await axios.post(`${process.env.OUTLINE_API_URL}/access-keys`, {}, {
-            headers: { 'Content-Type': 'application/json' },
-            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
-        });
-        const keyId = createResponse.data.id;
-        const keyName = `key_${userId}_${new Date().toISOString().split('T')[0]}`;
 
-        await axios.put(`${process.env.OUTLINE_API_URL}/access-keys/${keyId}/name`, { name: keyName }, {
-            headers: { 'Content-Type': 'application/json' },
-            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
-        });
+        // Ваш код для создания ключа здесь (необходимо дополнить)
 
-        const dynamicLink = `${process.env.OUTLINE_USERS_GATEWAY}/conf/${process.env.OUTLINE_SALT}${userId.toString(16)}#${process.env.CONN_NAME}`;
+        const currentDate = new Date();
+        const options = {
+            timeZone: 'Europe/Moscow',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        };
+        const formattedDate = currentDate.toLocaleString('ru-RU', options);
 
-        // Сохраняем ключ в базе данных
-        await saveKeyToDatabase(userId, keyId, dynamicLink);
+        // Сохраните ключ, ID пользователя и дату в базу данных
+        await db.query('INSERT INTO keys (user_id, creation_date) VALUES ($1, $2)', [userId, formattedDate]);
 
-        console.log(`Динамическая ссылка для пользователя ID = ${userId}: ${dynamicLink}`);
-        return dynamicLink;
+        console.log(`Ключ для пользователя ID = ${userId} успешно сохранен с датой ${formattedDate}.`);
+        // Вернуть динамическую ссылку или дальнейшая логика
     } catch (error) {
-        console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
+        console.error('Ошибка при создании нового ключа Outline:', error);
         return null;
     }
 }
 
-// Функция для сохранения ключа в базе данных
-async function saveKeyToDatabase(userId, keyValue, dynamicLink) {
-    const createdAt = new Date();
-    console.log(`Сохранение ключа для пользователя ID = ${userId} в базу данных.`);
-    try {
-        await db.query('INSERT INTO keys (user_id, key_value, created_at) VALUES ($1, $2, $3)', [userId, dynamicLink, createdAt]);
-        console.log(`Ключ для пользователя ID = ${userId} успешно сохранен в базе данных.`);
-    } catch (err) {
-        console.error(`Ошибка записи ключа для пользователя ID = ${userId}:`, err);
-    }
-}
-
-// Функция для получения списка ключей из базы данных
+// Получение списка ключей из базы данных
 async function getKeysFromDatabase(chatId) {
     console.log(`Запрос списка ключей от администратора ID = ${chatId}`);
     try {
-        const res = await db.query('SELECT id, user_id, key_value, created_at FROM keys'); // Запрос к базе данных для получения ключей
-        console.log(`Получено ${res.rows.length} ключей из базы данных.`); // Логируем количество ключей
+        const res = await db.query('SELECT id, user_id, key_value, created_at FROM keys');
+        console.log(`Получено ${res.rows.length} ключей из базы данных.`);
 
         let message = 'Список ключей:\n';
 
@@ -132,36 +120,11 @@ async function getKeysFromDatabase(chatId) {
     }
 }
 
-// Получение списка ключей
-async function getKeys(chatId) {
-    console.log(`Запрос списка ключей от пользователя ID = ${chatId}`);
-    try {
-        const response = await axios.get(`${process.env.OUTLINE_API_URL}/access-keys`, {
-            headers: { 'Content-Type': 'application/json' },
-            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
-        });
-        const keys = response.data.accessKeys;
-        let message = 'Список ключей:\n';
-
-        if (Array.isArray(keys) && keys.length > 0) {
-            keys.forEach(key => {
-                message += `ID: ${key.id}, Порт: ${key.port}, URL: ${key.accessUrl}\n`;
-            });
-        } else {
-            message = 'Нет доступных ключей.';
-        }
-        bot.sendMessage(chatId, message);
-    } catch (error) {
-        console.error('Ошибка получения ключей:', error.response ? error.response.data : error.message);
-        bot.sendMessage(chatId, 'Произошла ошибка при получении списка ключей.');
-    }
-}
-
 // Получение списка пользователей
 async function getUsers(chatId) {
     console.log(`Запрос списка пользователей от пользователя ID = ${chatId}`);
     try {
-        const res = await db.query('SELECT * FROM clients'); // Запрос к базе данных для получения пользователей
+        const res = await db.query('SELECT * FROM clients');
         console.log(`Получено ${res.rows.length} пользователей из базы данных.`);
 
         let message = 'Список пользователей:\n';
@@ -181,7 +144,6 @@ async function getUsers(chatId) {
     }
 }
 
-// Обработчик команд
 // Обработчик команд
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
@@ -203,14 +165,12 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, 'Извините, что-то пошло не так.');
         }
     } else if (text === 'Список ключей') {
-        console.log(`Проверка на админа для "Список ключей": ${isAdmin(chatId)}`);
         if (isAdmin(chatId)) {
-            await getKeysFromDatabase(chatId); // Получаем ключи из базы данных
+            await getKeysFromDatabase(chatId);
         } else {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
         }
     } else if (text === 'Список пользователей') {
-        console.log(`Проверка на админа для "Список пользователей": ${isAdmin(chatId)}`);
         if (isAdmin(chatId)) {
             await getUsers(chatId);
         } else {

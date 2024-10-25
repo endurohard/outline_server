@@ -123,7 +123,7 @@ async function getUsers(chatId) {
     console.log(`Запрос списка пользователей от пользователя ID = ${chatId}`);
     try {
         const res = await db.query('SELECT * FROM clients'); // Запрос к базе данных для получения пользователей
-        console.log(`Получено ${res.rows.length} пользователей из базы данных.`); // Логируем количество пользователей
+        console.log(`Получено ${res.rows.length} пользователей из базы данных.`);
 
         let message = 'Список пользователей:\n';
 
@@ -151,10 +151,11 @@ bot.on('message', async (msg) => {
 
     console.log(`Получено сообщение: ${text} от пользователя ID = ${chatId}`);
 
+    // Сохранение клиента при старте
     if (text === 'Старт') {
+        await saveClient(userId, userName);
         bot.sendMessage(chatId, 'Вы нажали кнопку «Старт». Чем я могу вам помочь?');
         showMainKeyboard(chatId);
-        await saveClient(userId, userName);
     } else if (text === 'Создать ключ') {
         const dynamicLink = await createNewKey(userId);
         if (dynamicLink) {
@@ -163,14 +164,12 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, 'Извините, что-то пошло не так.');
         }
     } else if (text === 'Список ключей') {
-        console.log(`Проверка на админа для "Список ключей": ${isAdmin(chatId)}`);
         if (isAdmin(chatId)) {
             await getKeys(chatId);
         } else {
             bot.sendMessage(chatId, 'У вас нет доступа к этой команде.');
         }
     } else if (text === 'Список пользователей') {
-        console.log(`Проверка на админа для "Список пользователей": ${isAdmin(chatId)}`);
         if (isAdmin(chatId)) {
             await getUsers(chatId);
         } else {

@@ -77,10 +77,19 @@ async function createNewKey(userId) {
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
 
-        const keyId = createResponse.data.id;
-        const outlineKey = createResponse.data.key; // Получите ключ, если он возвращается API
+        // Логируем полный ответ для отладки
+        console.log('Ответ от API при создании ключа:', createResponse.data);
+
+        const keyId = createResponse.data.id; // Если у вас есть ID ключа
+        const outlineKey = createResponse.data.key; // Получите ключ из API, убедитесь, что это поле существует
         const serverIp = 'bestvpn.world'; // Используем фиксированный IP
         const port = 54842; // Укажите нужный порт или получите его из API
+
+        // Проверяем, что outlineKey не undefined
+        if (!outlineKey) {
+            console.error('Ошибка: ключ Outline не был получен из API.');
+            return null; // Или обработайте ошибку по-другому
+        }
 
         // Форматирование динамической ссылки
         const dynamicLink = `ss://${outlineKey}@${serverIp}:${port}/?outline=1#RaphaelVPN`;

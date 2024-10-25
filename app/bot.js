@@ -122,7 +122,9 @@ async function getKeys(chatId) {
 async function getUsers(chatId) {
     console.log(`Запрос списка пользователей от пользователя ID = ${chatId}`);
     try {
-        const res = await db.query('SELECT * FROM clients');
+        const res = await db.query('SELECT * FROM clients'); // Запрос к базе данных для получения пользователей
+        console.log(`Получено ${res.rows.length} пользователей из базы данных.`); // Логируем количество пользователей
+
         let message = 'Список пользователей:\n';
 
         if (res.rows.length > 0) {
@@ -133,6 +135,7 @@ async function getUsers(chatId) {
             message = 'Нет зарегистрированных пользователей.';
         }
         bot.sendMessage(chatId, message);
+        console.log(`Отправка списка пользователей пользователю ID = ${chatId}`);
     } catch (err) {
         console.error('Ошибка получения списка пользователей:', err);
         bot.sendMessage(chatId, 'Произошла ошибка при получении списка пользователей.');

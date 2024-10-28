@@ -1,42 +1,77 @@
-const db = require('../db'); // Убедитесь, что db.js существует и правильно настроен
-const bot = require('../app/bot'); // Импортируйте бот, если нужно отправлять сообщения
+const db = require('../db');
+const { getKeysFromDatabase } = require('./getKeysFromDatabase'); // Импорт функции из файла
 
-async function getUsersWithKeys(chatId) {
+// Функция для проверки прав администратора
+function isAdmin(userId) {
+    return userId.toString() === adminId; // Сравнение userId с adminId
+}
+
+// Функция для отправки длинного сообщения частями
+async function sendLongMessage(bot, chatId, message, chunkSize = 4000) {
+    const messageChunks = message.match(new RegExp(`.{1,${chunkSize}}`, 'g')); // Разбивает на куски по 4000 символов
+    for (const chunk of messageChunks) {
+        await bot.sendMessage(chatId, chunk);
+    }
+}
+
+async function getUsersWithKeys(chatId, bot) {
     console.log(`Запрос списка пользователей с ключами от администратора ID = ${chatId}`);
     try {
         const res = await db.query(`
-            SELECT c.id, c.name, k.key_value
+            SELECT c.telegram_id, c.name, k.key_value, k.creation_date
             FROM clients c
                      LEFT JOIN keys k ON c.telegram_id = k.user_id
+            ORDER BY c.telegram_id, k.creation_date DESC;
         `);
 
+        console.log("Результаты запроса:", res.rows);
+
         let message = 'Список пользователей с их ключами:\n';
-        if (res.rows.length > 0) {
-            res.rows.forEach(row => {
-                message += `ID: ${row.id}, Имя: ${row.name}, Ключ: ${row.key_value || 'Нет ключа'}\n`;
-            });
-        } else {
+        let currentUser = null;
+        res.rows.forEach(row => {
+            if (currentUser !== row.telegram_id) {
+                currentUser = row.telegram_id;
+                message += `\nTelegram ID: ${row.telegram_id}, Имя: ${row.name || 'Неизвестный'}:\n`;
+            }
+            const key = row.key_value !== null ? row.key_value : 'Нет ключа';
+            message += `   Ключ: ${key}, Дата создания: ${row.creation_date}\n`;
+        });
+
+        if (res.rows.length === 0) {
             message = 'Нет зарегистрированных пользователей.';
         }
-        await sendLongMessage(chatId, message);
+
+        // Проверяем, что сообщение не пустое перед отправкой
+        if (message.trim()) {
+            await sendLongMessage(bot, chatId, message);
+        } else {
+            console.warn("Сформированное сообщение пустое, отправка отменена.");
+            await bot.sendMessage(chatId, 'Нет данных для отображения.');
+        }
+
     } catch (err) {
         console.error('Ошибка получения списка пользователей с ключами:', err);
         await bot.sendMessage(chatId, 'Произошла ошибка при получении списка пользователей с ключами.');
     }
 }
 
-// Функция для отправки длинных сообщений
-async function sendLongMessage(chatId, message) {
-    const MAX_MESSAGE_LENGTH = 4096; // Максимальная длина сообщения для Telegram
-    let parts = [];
-    while (message.length > MAX_MESSAGE_LENGTH) {
-        parts.push(message.substring(0, MAX_MESSAGE_LENGTH));
-        message = message.substring(MAX_MESSAGE_LENGTH);
-    }
-    if (message) parts.push(message);
-    for (const part of parts) {
-        await bot.sendMessage(chatId, part);
+async function getUsers(chatId, bot) {
+    console.log(`Запрос списка пользователей от администратора ID = ${chatId}`);
+    try {
+        const res = await db.query(`SELECT * FROM clients`);
+        let message = 'Список пользователей:\n';
+        if (res.rows.length > 0) {
+            res.rows.forEach(row => {
+                message += `ID: ${row.id}, Имя: ${row.name}\n`;
+            });
+        } else {
+            message = 'Нет зарегистрированных пользователей.';
+        }
+        await bot.sendMessage(chatId, message);
+    } catch (err) {
+        console.error('Ошибка получения списка пользователей:', err);
+        await bot.sendMessage(chatId, 'Произошла ошибка при получении списка пользователей.');
     }
 }
 
-module.exports = { getUsersWithKeys };
+module.exports = { getUsersWithKeys, getUsers, getKeysFromDatabase };

@@ -1,3 +1,4 @@
+
 const { Client } = require('pg'); // Импортируем клиент PostgreSQL
 
 const dbConfig = {

@@ -1,9 +1,10 @@
 const db = require('../db');
 const { getKeysFromDatabase } = require('./getKeysFromDatabase'); // Импорт функции из файла
+const pendingPaymentRequests = {}; // Временное хранилище для запросов реквизитов
 
 // Функция для проверки прав администратора
 function isAdmin(userId) {
-    return userId.toString() === adminId; // Сравнение userId с adminId
+    return userId.toString() === process.env.ADMIN_ID; // Сравнение userId с adminId из .env
 }
 
 // Функция для отправки длинного сообщения частями
@@ -14,7 +15,7 @@ async function sendLongMessage(bot, chatId, message, chunkSize = 4000) {
     }
 }
 
-async function getUsersWithKeys(chatId, bot) {
+async function getUsersWithKeys(bot, chatId) {
     console.log(`Запрос списка пользователей с ключами от администратора ID = ${chatId}`);
     try {
         const res = await db.query(`
@@ -41,21 +42,18 @@ async function getUsersWithKeys(chatId, bot) {
             message = 'Нет зарегистрированных пользователей.';
         }
 
-        // Проверяем, что сообщение не пустое перед отправкой
         if (message.trim()) {
             await sendLongMessage(bot, chatId, message);
         } else {
-            console.warn("Сформированное сообщение пустое, отправка отменена.");
             await bot.sendMessage(chatId, 'Нет данных для отображения.');
         }
-
     } catch (err) {
         console.error('Ошибка получения списка пользователей с ключами:', err);
         await bot.sendMessage(chatId, 'Произошла ошибка при получении списка пользователей с ключами.');
     }
 }
 
-async function getUsers(chatId, bot) {
+async function getUsers(bot, chatId) {
     console.log(`Запрос списка пользователей от администратора ID = ${chatId}`);
     try {
         const res = await db.query(`SELECT * FROM clients`);
@@ -74,4 +72,23 @@ async function getUsers(chatId, bot) {
     }
 }
 
-module.exports = { getUsersWithKeys, getUsers, getKeysFromDatabase };
+// Функция для отправки реквизитов для оплаты
+async function requestPaymentDetails(bot, chatId, clientChatId, userName) {
+    pendingPaymentRequests[chatId] = clientChatId; // Сохраняем ID чата клиента для админа
+    await bot.sendMessage(chatId, `Пожалуйста, отправьте реквизиты для оплаты для @${userName}`);
+}
+
+// Обработчик текстовых сообщений от администратора для отправки реквизитов
+async function handleAdminPaymentMessage(bot, msg) {
+    const adminId = msg.from.id;
+    const paymentRequest = pendingPaymentRequests[adminId];
+    if (!paymentRequest) return;
+
+    const { clientChatId, userName } = paymentRequest;
+    const paymentDetails = msg.text;
+
+    await bot.sendMessage(clientChatId, `Пожалуйста, произведите оплату. Реквизиты от администратора:\n${paymentDetails}`);
+    delete pendingPaymentRequests[adminId];
+}
+
+module.exports = { getUsersWithKeys, getUsers, getKeysFromDatabase, requestPaymentDetails, handleAdminPaymentMessage };

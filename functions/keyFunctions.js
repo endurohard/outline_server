@@ -1,79 +1,68 @@
 const axios = require('axios');
-const db = require('../db'); // Подключаем модуль для работы с базой данных
+const db = require('../db');
 
-async function requestNewKey(bot, userId, chatId, userName, adminId, pendingKeyRequests) {
-    console.log(`Пользователь ID = ${userId} запросил новый ключ.`);
-    const requestId = Date.now();
-    pendingKeyRequests[requestId] = { userId, chatId, userName };
-
-    const options = {
-        reply_markup: {
-            inline_keyboard: [
-                [
-                    { text: 'Подтвердить', callback_data: `confirm_${requestId}` },
-                    { text: 'Отклонить', callback_data: `decline_${requestId}` }
-                ]
-            ]
-        }
-    };
-
-    await bot.sendMessage(adminId, `Пользователь ID = ${userId} запросил ключ. Подтвердите создание.`, options);
+// Функция для экранирования HTML-символов
+function escapeHTML(text) {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// Создание ключа и отправка пользователю
-async function createNewKey(bot, userId, chatId) {
+// Функция для создания, сохранения и отправки ключа пользователю
+async function createAndSendKey(bot, userId, chatId, serverId, serverApiUrl, serverName, domain) {
     if (!userId || !chatId) {
-        console.error(`[createNewKey] Ошибка: userId или chatId отсутствуют. userId: ${userId}, chatId: ${chatId}`);
+        console.log(`[createAndSendKey] Запрос на создание ключа для пользователя ${userId} на сервере ${serverName}`);
+        console.error(`[createAndSendKey] Ошибка: userId или chatId отсутствуют. userId: ${userId}, chatId: ${chatId}`);
         return null;
     }
 
     try {
-        console.log(`Создание нового ключа для пользователя ID = ${userId}`);
+        console.log(`[createAndSendKey] Создание нового ключа через API Outline для пользователя ${userId}`);
 
-        // Создаем новый ключ через API Outline
-        const createResponse = await axios.post(`${process.env.OUTLINE_API_URL}/access-keys`, {}, {
+        const createResponse = await axios.post(`${serverApiUrl}/access-keys`, {}, {
             headers: { 'Content-Type': 'application/json' },
-            timeout: 10000,  // 10 секунд
+            timeout: 10000,
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
         });
 
-        // Проверка, что createResponse.data содержит нужные поля
+        console.log(`[createAndSendKey] Ответ от API на создание ключа:`, createResponse.data);
+
         if (!createResponse.data || !createResponse.data.id || !createResponse.data.accessUrl || !createResponse.data.port) {
-            console.error('Ошибка: API Outline не вернул необходимые данные.');
+            console.error('[createAndSendKey] Ошибка: API Outline не вернул необходимые данные.');
             return null;
         }
 
         const { id: keyId, accessUrl, port } = createResponse.data;
-        const serverIp = 'bestvpn.world';
-
         const currentDate = new Date();
         const keyName = `User_${userId}_${currentDate.toISOString().slice(0, 10)}`;
 
-        // Устанавливаем имя для ключа через API
+        // Устанавливаем имя ключа через API
         await axios.put(
-            `${process.env.OUTLINE_API_URL}/access-keys/${keyId}/name`,
+            `${serverApiUrl}/access-keys/${keyId}/name`,
             { name: keyName },
             { headers: { 'Content-Type': 'application/json' }, httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }) }
         );
 
-        // Форматируем ключ как URL с заменой хоста на serverIp
-        const formattedKey = `${accessUrl.replace(/@.*?:/, `@${serverIp}:${port}/`)}#RaphaelVPN`;
+        // Подставляем домен сервера в ссылку доступа
+        const formattedKey = `${accessUrl.replace(/@.*?:/, `@${domain}:${port}/`)}#RaphaelVPN`;
 
-        // Записываем ключ и дату создания в базу данных
+        // Сохраняем ключ в базе данных
         const insertResult = await db.query(
-            `INSERT INTO keys (user_id, key_value, creation_date) VALUES ($1, $2, $3) RETURNING *`,
-            [userId, formattedKey, currentDate]
+            `INSERT INTO keys (user_id, server_id, key_value, creation_date) VALUES ($1, $2, $3, $4) RETURNING *`,
+            [userId, serverId, formattedKey, currentDate]
         );
 
         if (insertResult.rowCount === 0) {
-            console.error(`Ошибка: не удалось сохранить ключ в базе данных для пользователя ID = ${userId}`);
+            console.error(`[createAndSendKey] Ошибка: не удалось сохранить ключ в базе данных для пользователя ID = ${userId}`);
             return null;
         }
 
-        console.log(`Ключ для пользователя ID = ${userId} успешно создан и сохранен в базе данных.`);
+        console.log(`[createAndSendKey] Ключ для пользователя ID = ${userId} успешно создан и сохранен в базе данных.`);
 
-        // Отправка сообщения с ключом
-        await bot.sendMessage(chatId, `Ваш ключ: ${formattedKey}`);
+        // Экранируем ключ для HTML
+        const escapedKey = escapeHTML(formattedKey);
+
+        // Отправляем ключ пользователю в формате HTML
+        await bot.sendMessage(chatId, `Ваш ключ для ${serverName}:\n<code>${escapedKey}</code>`, { parse_mode: 'HTML' });
+
         await bot.sendMessage(chatId, 'Скопируйте ключ целиком из сообщения выше', {
             reply_markup: {
                 inline_keyboard: [
@@ -84,9 +73,8 @@ async function createNewKey(bot, userId, chatId) {
 
         return { formattedKey, creationDate: currentDate };
     } catch (error) {
-        console.error('Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
-        return null;
+        console.error('[createAndSendKey] Ошибка при создании нового ключа Outline:', error.response ? error.response.data : error.message);
     }
 }
 
-module.exports = { requestNewKey, createNewKey };
+module.exports = { createAndSendKey };

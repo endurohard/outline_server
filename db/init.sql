@@ -5,10 +5,18 @@ CREATE TABLE IF NOT EXISTS clients (
                                        name VARCHAR(255)
     );
 
--- Создание таблицы keys для хранения ключей доступа, связанных с пользователями
+-- Создание таблицы servers для хранения информации о серверах
+CREATE TABLE IF NOT EXISTS servers (
+                                       id SERIAL PRIMARY KEY,
+                                       name VARCHAR(50) NOT NULL UNIQUE,
+    api_url VARCHAR(255) NOT NULL
+    );
+
+-- Создание таблицы keys для хранения ключей доступа, связанных с пользователями и серверами
 CREATE TABLE IF NOT EXISTS keys (
                                     id SERIAL PRIMARY KEY,
                                     user_id BIGINT NOT NULL REFERENCES clients(telegram_id) ON DELETE CASCADE,
+    server_id INT NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
     key_value VARCHAR(255) NOT NULL,
     creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expiration_date TIMESTAMP  -- Новый столбец для хранения даты истечения ключа

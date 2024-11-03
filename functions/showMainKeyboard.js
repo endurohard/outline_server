@@ -1,8 +1,4 @@
-const TelegramBot = require('node-telegram-bot-api');
-
 function showMainKeyboard(bot, chatId, isAdminUser) {
-    console.log(`Отображение клавиатуры для ${isAdminUser ? 'администратора' : 'пользователя'}`);
-
     const options = {
         reply_markup: {
             keyboard: isAdminUser
@@ -16,12 +12,10 @@ function showMainKeyboard(bot, chatId, isAdminUser) {
                     [{ text: 'Инструкция' }]
                 ],
             resize_keyboard: true,
-            one_time_keyboard: false // Клавиатура останется видимой
+            one_time_keyboard: false
         }
     };
-
-    // Добавляем текст сообщения перед отправкой клавиатуры
     bot.sendMessage(chatId, 'Выберите действие:', options);
 }
 
-module.exports = { showMainKeyboard };
+module.exports = showMainKeyboard; // Экспорт функции

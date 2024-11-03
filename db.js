@@ -1,19 +1,18 @@
-
-const { Client } = require('pg'); // Импортируем клиент PostgreSQL
-
+const { Pool } = require('pg'); // Используем только Pool
 const dbConfig = {
-    host: process.env.POSTGRES_HOST || 'localhost', // Хост базы данных
-    port: process.env.POSTGRES_PORT || 5432, // Порт базы данных
-    user: process.env.POSTGRES_USER, // Имя пользователя
-    password: process.env.POSTGRES_PASSWORD, // Пароль
-    database: process.env.POSTGRES_NAME, // Имя базы данных
+    host: process.env.POSTGRES_HOST || 'localhost',
+    port: process.env.POSTGRES_PORT || 5432,
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD,
+    database: process.env.POSTGRES_NAME,
 };
 
-const db = new Client(dbConfig);
+const db = new Pool(dbConfig); // Создаем пул соединений
 
-// Подключение к базе данных
-db.connect()
-    .then(() => console.log("Подключение к PostgreSQL успешно!"))
-    .catch(err => console.error("Ошибка подключения к PostgreSQL:", err));
+// Логирование ошибок пула
+db.on('error', (err) => {
+    console.error('Unexpected error on idle client', err);
+});
 
-module.exports = db; // Экспортируем подключение к базе данных
+// Экспортируем пул соединений для использования в других модулях
+module.exports = db;

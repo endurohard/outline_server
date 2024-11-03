@@ -7,8 +7,9 @@ function getServersFromEnv() {
         if (key.startsWith('OUTLINE_API_URL_')) {
             const serverSuffix = key.split('OUTLINE_API_URL_')[1].toLowerCase();
             const serverName = serverSuffix.charAt(0).toUpperCase() + serverSuffix.slice(1);
-            const apiUrl = value;
-            servers.push({ name: serverName, apiUrl });
+
+            const [id, apiUrl] = value.split('|');
+            servers.push({ id: parseInt(id, 10), name: serverName, apiUrl });
         }
     }
     return servers;

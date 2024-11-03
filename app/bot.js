@@ -5,6 +5,7 @@ const { saveClient } = require('../functions/clientFunctions');
 const { createAndSendKey } = require('../functions/keyFunctions');
 const { getUsersWithKeys, getUsers, requestPaymentDetails, handleAdminPaymentMessage } = require('../functions/adminFunctions');
 const getServersFromEnv = require('../functions/generateServers');
+const servers = getServersFromEnv();  // Загружаем серверы из .env
 const getKeysFromDatabase = require('../functions/getKeysFromDatabase');
 const sendLongMessage = require('../functions/sendLongMessage');
 const showMainKeyboard = require('../functions/showMainKeyboard');
@@ -22,7 +23,6 @@ const db = new Pool({
 const bot = new TelegramBot(token, { polling: true });
 console.log("[Bot] Бот запущен...");
 
-const servers = getServersFromEnv();
 const lastCommand = {};
 const pendingKeyRequests = {};
 const pendingPaymentRequests = {};
@@ -34,20 +34,22 @@ async function sendSafeMessage(bot, chatId, text, options = {}) {
     }
 }
 
+// Отправка списка серверов для выбора
 async function showServerSelection(bot, chatId) {
+    const servers = getServersFromEnv();  // убедимся, что массив серверов инициализирован заново
     console.log(`[showServerSelection] Отправка списка серверов для выбора пользователю ID ${chatId}`);
 
     const buttons = servers.map(server => [
-        { text: server.name, callback_data: `select_server_${server.name}` }  // Убрано | и URL
+        { text: server.name, callback_data: `select_server_${server.name}` }
     ]);
 
     await bot.sendMessage(chatId, 'Выберите сервер для создания ключа:', {
         reply_markup: { inline_keyboard: buttons }
     });
-
     console.log(`[showServerSelection] Список серверов отправлен пользователю ID ${chatId}`);
 }
 
+// Код для обработки команд пользователя с логированием
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
@@ -61,7 +63,7 @@ bot.on('message', async (msg) => {
             if (command === 'создать ключ') {
                 console.log(`[onMessage] Выполняется команда 'создать ключ'`);
                 await sendSafeMessage(bot, chatId, 'Выберите сервер для создания ключа:');
-                await showServerSelection(bot, chatId);
+                await showServerSelection(bot, chatId);  // Вызов функции выбора сервера
             } else if (command === 'список пользователей') {
                 console.log(`[onMessage] Выполняется команда 'список пользователей'`);
                 await getUsers(bot, chatId);
@@ -86,10 +88,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const userId = callbackQuery.from.id;
 
     if (data.startsWith('select_server_')) {
-        console.log(`[callback_query] Получен выбор сервера: ${data}`);
-
-        const serverData = data.split('select_server_')[1];
-        const [serverName, apiUrl] = serverData.split('|'); // Разделяем на имя сервера и URL
+        const serverName = data.split('select_server_')[1];
         const selectedServer = servers.find(server => server.name === serverName);
 
         if (!selectedServer) {
@@ -98,11 +97,7 @@ bot.on('callback_query', async (callbackQuery) => {
             return;
         }
 
-        console.log(`[callback_query] Пользователь выбрал сервер: ${selectedServer.name} с URL: ${apiUrl}`);
-        console.log(`[createAndSendKey] Начало создания ключа для пользователя ID = ${userId} на сервере ${serverName}`);
-
-        await createAndSendKey(bot, userId, chatId, serverName, apiUrl, serverName)
-            .then(() => console.log(`[createAndSendKey] Ключ успешно создан для пользователя ID ${userId} на сервере ${serverName}`))
-            .catch(error => console.error(`[createAndSendKey] Ошибка при создании ключа: ${error}`));
+        console.log(`[callback_query] Пользователь выбрал сервер: ${selectedServer.name} с URL: ${selectedServer.apiUrl}`);
+        await createAndSendKey(bot, userId, chatId, selectedServer.name, selectedServer.apiUrl, selectedServer.name);
     }
 });

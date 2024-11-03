@@ -1,4 +1,4 @@
-const getServersFromEnv = require('../functions/generateServers');
+const getServersFromEnv = require('./functions/generateServers');
 
 async function insertServersFromEnv(db) {
     const servers = getServersFromEnv();
@@ -6,11 +6,11 @@ async function insertServersFromEnv(db) {
     for (const server of servers) {
         try {
             await db.query(
-                `INSERT INTO servers (name, api_url) VALUES ($1, $2)
-                    ON CONFLICT (name) DO NOTHING`,
-                [server.name, server.apiUrl]
+                `INSERT INTO servers (id, name, api_url) VALUES ($1, $2, $3)
+                    ON CONFLICT (id) DO NOTHING`,
+                [server.id, server.name, server.apiUrl]
             );
-            console.log(`[Database] Сервер "${server.name}" добавлен в базу данных.`);
+            console.log(`[Database] Сервер "${server.name}" с ID "${server.id}" добавлен в базу данных.`);
         } catch (error) {
             console.error(`[Database] Ошибка при добавлении сервера "${server.name}":`, error);
         }
@@ -28,7 +28,7 @@ async function initializeDatabase(db) {
 
     const createServersTable = `
         CREATE TABLE IF NOT EXISTS servers (
-                                               id SERIAL PRIMARY KEY,
+                                               id INT PRIMARY KEY,
                                                name VARCHAR(50) NOT NULL UNIQUE,
             api_url VARCHAR(255) NOT NULL
             );

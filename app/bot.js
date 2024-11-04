@@ -96,7 +96,7 @@ bot.on('message', async (msg) => {
                                 { text: 'Скачать для macOS', url: 'https://itunes.apple.com/us/app/outline-app/id1356177741?mt=12' }
                             ],
                             [
-                                { text: 'Тех поддержка', url: 'https://t.me/bagamedovit' }  // Замените на сайт, если нужно
+                                { text: 'Тех поддержка', url: 'https://t.me/bagamedovit' }
                             ]
                         ]
                     }
@@ -109,8 +109,19 @@ bot.on('message', async (msg) => {
             // Команды для обычных пользователей
             if (command === 'запросить ключ') {
                 console.log(`[onMessage] Пользователь запросил ключ`);
-                await sendSafeMessage(bot, chatId, 'Выберите сервер для запроса ключа:');
-                await showServerSelection(bot, chatId);
+                await sendSafeMessage(bot, chatId, 'Ваш запрос отправлен администратору на подтверждение.');
+
+                // Отправляем уведомление администратору
+                await bot.sendMessage(adminId, `Пользователь ID ${userId} запросил создание ключа. Подтвердите запрос.`, {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                { text: 'Подтвердить', callback_data: `confirm_create_key_${userId}` },
+                                { text: 'Отклонить', callback_data: `decline_create_key_${userId}` }
+                            ]
+                        ]
+                    }
+                });
             } else if (command === 'инструкция') {
                 console.log(`[onMessage] Выполняется команда 'инструкция' для пользователя ID = ${userId}`);
                 await sendSafeMessage(bot, chatId, 'Выберите версию программы для скачивания:', {
@@ -125,14 +136,14 @@ bot.on('message', async (msg) => {
                                 { text: 'Скачать для macOS', url: 'https://itunes.apple.com/us/app/outline-app/id1356177741?mt=12' }
                             ],
                             [
-                                { text: 'Тех поддержка', url: 'https://t.me/bagamedovit' }  // Замените на сайт, если нужно
+                                { text: 'Тех поддержка', url: 'https://t.me/bagamedovit' }
                             ]
                         ]
                     }
                 });
                 console.log(`[onMessage] Кнопки для скачивания отправлены пользователю ID = ${userId}`);
             } else {
-                await sendSafeMessage(bot, chatId, "Неизвестная команда администратора.");
+                await sendSafeMessage(bot, chatId, "Неизвестная команда.");
             }
         }
     } catch (error) {
@@ -147,7 +158,20 @@ bot.on('callback_query', async (callbackQuery) => {
     const chatId = callbackQuery.message.chat.id;
     const userId = callbackQuery.from.id;
 
-    if (data.startsWith('select_server_')) {
+    if (data.startsWith('confirm_create_key_')) {
+        const requestedUserId = parseInt(data.split('confirm_create_key_')[1], 10);
+
+        console.log(`[callback_query] Администратор подтвердил запрос на создание ключа для пользователя ID ${requestedUserId}`);
+        await bot.sendMessage(requestedUserId, 'Ваш запрос на создание ключа подтвержден. Выберите сервер для создания ключа:');
+        await showServerSelection(bot, requestedUserId);
+
+    } else if (data.startsWith('decline_create_key_')) {
+        const requestedUserId = parseInt(data.split('decline_create_key_')[1], 10);
+
+        console.log(`[callback_query] Администратор отклонил запрос на создание ключа для пользователя ID ${requestedUserId}`);
+        await bot.sendMessage(requestedUserId, 'Ваш запрос на создание ключа отклонен администратором.');
+
+    } else if (data.startsWith('select_server_')) {
         const serverName = data.split('select_server_')[1];
         const selectedServer = servers.find(server => server.name === serverName);
 

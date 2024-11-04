@@ -50,6 +50,13 @@ bot.on('message', async (msg) => {
     const command = msg.text?.trim().toLowerCase();
     const isAdminUser = userId.toString() === adminId;
 
+    // Проверка на ожидание реквизитов и вызов обработчика handleAdminPaymentMessage
+    if (isAdminUser && pendingPaymentRequests[chatId]) {
+        console.log(`[82] Администратор ${userId} отправляет реквизиты для оплаты`);
+        await handleAdminPaymentMessage(bot, msg); // Обработка отправки реквизитов
+        return; // Завершаем обработку, если реквизиты были отправлены
+    }
+
     console.log(`[5] Получена команда: ${command} от пользователя ID ${userId}`);
 
     try {
@@ -85,8 +92,8 @@ bot.on('message', async (msg) => {
                     reply_markup: {
                         inline_keyboard: [
                             [
-                                { text: 'Подтвердить', callback_data: `confirm_create_key_${userId}` },
-                                { text: 'Отклонить', callback_data: `decline_create_key_${userId}` }
+                                { text: 'Подтвердить', callback_data: `confirm_create_key_${userId.toString()}` },
+                                { text: 'Отклонить', callback_data: `decline_create_key_${userId.toString()}` }
                             ]
                         ]
                     }
@@ -123,82 +130,87 @@ bot.on('message', async (msg) => {
 // Обработчик callback_query для подтверждения создания ключа
 bot.on('callback_query', async (callbackQuery) => {
     const data = callbackQuery.data;
-    const chatId = callbackQuery.message.chat.id;
 
     console.log(`[17] Обработка callback_query: ${data}`);
 
-    // Если администратор подтверждает создание ключа
-    if (data.startsWith('confirm_create_key_')) {
-        const requestedUserId = data.split('confirm_create_key_')[1];
-        console.log(`[18] Подтверждение создания ключа для пользователя ID ${requestedUserId}`);
+    try {
+        // Если администратор подтверждает запрос на создание ключа
+        if (data.startsWith('confirm_create_key_')) {
+            const requestedUserId = data.split('confirm_create_key_')[1];
+            console.log(`[18] Подтверждение создания ключа для пользователя ID ${requestedUserId}`);
 
-        // Проверка наличия ID пользователя и сервера
-        if (!requestedUserId) {
-            console.error("[19] Ошибка: ID пользователя не найден");
-            await bot.sendMessage(adminId, "Ошибка: ID пользователя не найден.");
-            return;
-        }
-
-        // Отправка сообщения администратору с выбором сервера для создания ключа
-        await showServerSelection(bot, requestedUserId);
-        console.log(`[20] Список серверов отправлен пользователю ID ${requestedUserId} для выбора`);
-    }
-
-    // Если пользователь выбирает сервер
-    if (data.startsWith('select_server_')) {
-        const serverName = data.split('select_server_')[1];
-        const selectedServer = servers.find(server => server.name === serverName);
-
-        if (!selectedServer) {
-            console.error(`[21] Ошибка: выбранный сервер ${serverName} не найден.`);
-            await bot.sendMessage(chatId, "Ошибка при выборе сервера. Попробуйте снова.");
-            return;
-        }
-
-        console.log(`[22] Сервер ${serverName} выбран пользователем ID ${chatId}`);
-
-        // Уведомление администратору для подтверждения создания ключа
-        await bot.sendMessage(adminId, `Пользователь с ID ${chatId} выбрал сервер "${selectedServer.name}". Подтвердите создание ключа.`, {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: 'Подтвердить', callback_data: `approve_key_${chatId}_${selectedServer.name}` }],
-                    [{ text: 'Отклонить', callback_data: `decline_key_${chatId}` }]
-                ]
+            if (!requestedUserId || isNaN(parseInt(requestedUserId, 10))) {
+                console.error(`[19] Ошибка: некорректный userId: ${requestedUserId}`);
+                await bot.sendMessage(adminId, "Ошибка: некорректный ID пользователя.");
+                return;
             }
-        });
-        console.log(`[23] Запрос на подтверждение создания ключа отправлен администратору.`);
-    }
 
-    // Если администратор подтверждает сервер и создание ключа
-    if (data.startsWith('approve_key_')) {
-        const parts = data.split('_');
-
-        if (parts.length < 3) {
-            console.error("[24] Ошибка: некорректные данные в callback_query");
-            await bot.sendMessage(adminId, "Ошибка: некорректные данные в запросе.");
-            return;
+            // Отправка сообщения с выбором сервера пользователю
+            await showServerSelection(bot, parseInt(requestedUserId, 10));
+            console.log(`[20] Список серверов отправлен пользователю ID ${requestedUserId} для выбора`);
         }
 
-        const requestedUserId = parts[2];
-        const serverName = parts.slice(3).join('_'); // Корректно соединяем оставшуюся часть как имя сервера
-        const selectedServer = servers.find(server => server.name === serverName);
+        // Если пользователь выбирает сервер
+        if (data.startsWith('select_server_')) {
+            const userId = callbackQuery.from.id;
+            const serverName = data.split('select_server_')[1];
+            const selectedServer = servers.find(server => server.name === serverName);
 
-        if (!selectedServer) {
-            console.error(`[25] Ошибка: выбранный сервер "${serverName}" не найден.`);
-            await bot.sendMessage(adminId, "Ошибка: выбранный сервер не найден.");
-            return;
+            if (!selectedServer) {
+                console.error(`[21] Ошибка: выбранный сервер ${serverName} не найден.`);
+                await bot.sendMessage(userId, "Ошибка при выборе сервера. Попробуйте снова.");
+                return;
+            }
+
+            console.log(`[22] Сервер ${serverName} выбран пользователем ID ${userId}`);
+
+            // Уведомление администратору для подтверждения создания ключа
+            await bot.sendMessage(adminId, `Пользователь с ID ${userId} выбрал сервер "${selectedServer.name}". Подтвердите создание ключа.`, {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'Подтвердить', callback_data: `approve_key_${userId}_${selectedServer.name}` }],
+                        [{ text: 'Отклонить', callback_data: `decline_key_${userId}` }]
+                    ]
+                }
+            });
+            console.log(`[23] Запрос на подтверждение создания ключа отправлен администратору.`);
         }
 
-        console.log(`[26] Администратор подтвердил создание ключа для пользователя ID ${requestedUserId} на сервере ${serverName}`);
+        // Если администратор подтверждает сервер и создание ключа
+        if (data.startsWith('approve_key_')) {
+            const parts = data.split('_');
 
-        // Создание и отправка ключа
-        try {
-            await createAndSendKey(bot, parseInt(requestedUserId, 10), parseInt(requestedUserId, 10), selectedServer.name, selectedServer.apiUrl, selectedServer.name, adminId);
-            console.log(`[27] Ключ создан и отправлен пользователю ID ${requestedUserId}`);
-            await bot.sendMessage(adminId, `Ключ для пользователя ID ${requestedUserId} успешно создан и отправлен.`);
-        } catch (error) {
-            console.error(`[28] Ошибка при создании ключа для пользователя ID ${requestedUserId}:`, error);
-            await bot.sendMessage(adminId, "Ошибка при создании ключа. Попробуйте позже.");
+            if (parts.length < 3) {
+                console.error("[24] Ошибка: некорректные данные в callback_query");
+                await bot.sendMessage(adminId, "Ошибка: некорректные данные в запросе.");
+                return;
+            }
+
+            const requestedUserId = parts[2];
+            const serverName = parts.slice(3).join('_');
+            const selectedServer = servers.find(server => server.name === serverName);
+
+            if (!selectedServer) {
+                console.error(`[25] Ошибка: выбранный сервер "${serverName}" не найден.`);
+                await bot.sendMessage(adminId, "Ошибка: выбранный сервер не найден.");
+                return;
+            }
+
+            console.log(`[26] Администратор подтвердил создание ключа для пользователя ID ${requestedUserId} на сервере ${serverName}`);
+
+            try {
+                const keyResult = await createAndSendKey(bot, parseInt(requestedUserId, 10), parseInt(requestedUserId, 10), selectedServer.name, selectedServer.apiUrl, selectedServer.name, adminId);
+
+                // Уведомление администратору о создании ключа
+                console.log(`[27] Ключ создан для пользователя ID ${requestedUserId} на сервере ${serverName}`);
+                await bot.sendMessage(adminId, `Ключ для пользователя ID ${requestedUserId} успешно создан:\n${keyResult.accessUrl}`);
+            } catch (error) {
+                console.error(`[28] Ошибка при создании ключа для пользователя ID ${requestedUserId}:`, error);
+                await bot.sendMessage(adminId, "Ошибка при создании ключа. Попробуйте позже.");
+            }
         }
+    } catch (error) {
+        console.error(`[29] [Error] Ошибка в обработчике callback_query для ${data}:`, error);
+        await bot.sendMessage(adminId, "Произошла ошибка. Попробуйте позже.");
     }
 });

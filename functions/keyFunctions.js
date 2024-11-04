@@ -1,6 +1,9 @@
 const axios = require('axios');
 const db = require('../db');
 
+// Подгружаем основной домен из переменных окружения
+const BASE_DOMAIN = process.env.BASE_DOMAIN || 'bestvpn.world';
+
 console.log('[0] Файл keyFunctions.js загружен');
 
 // Функция для экранирования HTML-символов
@@ -9,7 +12,7 @@ function escapeHTML(text) {
 }
 
 // Функция для создания, сохранения и отправки ключа пользователю
-async function createAndSendKey(bot, userId, chatId, serverName, serverApiUrl, domain, adminId) {
+async function createAndSendKey(bot, userId, chatId, serverName, serverApiUrl, serverEnvName, adminId) {
     console.log(`[22] [createAndSendKey] Начало создания ключа для пользователя ID = ${userId} на сервере ${serverName}`);
 
     if (!userId || !chatId) {
@@ -48,8 +51,9 @@ async function createAndSendKey(bot, userId, chatId, serverName, serverApiUrl, d
         );
         console.log(`[29] [createAndSendKey] Имя ключа установлено через API`);
 
-        // Подставляем домен сервера в ссылку доступа
-        const formattedKey = `${accessUrl.replace(/@.*?:/, `@${domain}:${port}/`)}#RaphaelVPN`;
+        // Подставляем домен сервера в ссылку доступа, используя BASE_DOMAIN и имя сервера
+        const domain = `${serverEnvName.toLowerCase()}.${BASE_DOMAIN}`;
+        const formattedKey = `${accessUrl.replace(/@[^:]+:/, `@${domain}:`)}#RaphaelVPN`;
         console.log(`[30] [createAndSendKey] Сформированный доступный ключ: ${formattedKey}`);
 
         // Получаем `server_id` из базы данных по имени сервера

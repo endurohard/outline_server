@@ -3,15 +3,17 @@ const TelegramBot = require('node-telegram-bot-api');
 const { Pool } = require('pg');
 const { saveClient } = require('../functions/clientFunctions');
 const { createAndSendKey } = require('../functions/keyFunctions');
+console.log('[Main] Функция createAndSendKey импортирована');
 const { getUsersWithKeys, getUsers, requestPaymentDetails, handleAdminPaymentMessage } = require('../functions/adminFunctions');
 const getServersFromEnv = require('../functions/generateServers');
-const servers = getServersFromEnv();  // Загружаем серверы из .env
+const servers = getServersFromEnv();
 const getKeysFromDatabase = require('../functions/getKeysFromDatabase');
 const sendLongMessage = require('../functions/sendLongMessage');
 const showMainKeyboard = require('../functions/showMainKeyboard');
 
 const token = process.env.TELEGRAM_TOKEN;
 const adminId = process.env.ADMIN_ID?.toString();
+console.log(`[1] Администраторский ID загружен: ${adminId}`);
 const db = new Pool({
     host: process.env.POSTGRES_HOST || 'localhost',
     port: process.env.POSTGRES_PORT || 5432,
@@ -21,23 +23,15 @@ const db = new Pool({
 });
 
 const bot = new TelegramBot(token, { polling: true });
-console.log("[Bot] Бот запущен...");
+console.log("[2] Бот запущен...");
 
 const lastCommand = {};
 const pendingKeyRequests = {};
 const pendingPaymentRequests = {};
 
-// Определение функции sendSafeMessage
-async function sendSafeMessage(bot, chatId, text, options = {}) {
-    if (text && text.trim()) {
-        await bot.sendMessage(chatId, text, options);
-    }
-}
-
 // Отправка списка серверов для выбора
 async function showServerSelection(bot, chatId) {
-    const servers = getServersFromEnv();  // убедимся, что массив серверов инициализирован заново
-    console.log(`[showServerSelection] Отправка списка серверов для выбора пользователю ID ${chatId}`);
+    console.log(`[3] Вызов showServerSelection для пользователя ID ${chatId}`);
 
     const buttons = servers.map(server => [
         { text: server.name, callback_data: `select_server_${server.name}` }
@@ -46,72 +40,47 @@ async function showServerSelection(bot, chatId) {
     await bot.sendMessage(chatId, 'Выберите сервер для создания ключа:', {
         reply_markup: { inline_keyboard: buttons }
     });
-    console.log(`[showServerSelection] Список серверов отправлен пользователю ID ${chatId}`);
+    console.log(`[4] Список серверов отправлен пользователю ID ${chatId}`);
 }
 
-// Код для обработки команд пользователя с логированием
+// Обработчик сообщений
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const command = msg.text?.trim().toLowerCase();
-    const isAdminUser = userId.toString() === adminId; // Проверка администратора
+    const isAdminUser = userId.toString() === adminId;
 
-    console.log(`[onMessage] Получена команда: ${command} от пользователя ID ${userId}`);
+    console.log(`[5] Получена команда: ${command} от пользователя ID ${userId}`);
 
     try {
-        // Вызов `showMainKeyboard` при командах `/start` или `/menu` для показа клавиатуры
         if (command === '/start' || command === '/menu') {
-            console.log(`[onMessage] Отображение главной клавиатуры`);
             await bot.sendMessage(chatId, 'Добро пожаловать! Чем могу помочь?');
-            showMainKeyboard(bot, chatId, isAdminUser); // Показываем клавиатуру
+            console.log(`[6] Главная клавиатура отправлена пользователю ID ${userId}`);
+            showMainKeyboard(bot, chatId, isAdminUser);
             await saveClient(userId, msg.from.username || msg.from.first_name || 'Неизвестный');
+            console.log(`[7] Пользователь ${userId} сохранен в базе данных`);
         }
 
         if (isAdminUser) {
-            // Команды администратора
             if (command === 'создать ключ') {
-                console.log(`[onMessage] Выполняется команда 'создать ключ' администратором`);
-                await sendSafeMessage(bot, chatId, 'Выберите сервер для создания ключа:');
+                console.log(`[8] Администратор ${userId} запросил создание ключа`);
                 await showServerSelection(bot, chatId);
+                console.log(`[9] Список серверов отправлен администратору ID ${userId}`);
             } else if (command === 'список пользователей') {
-                console.log(`[onMessage] Выполняется команда 'список пользователей' администратором`);
                 await getUsers(bot, chatId);
+                console.log(`[10] Список пользователей отправлен администратору ID ${userId}`);
             } else if (command === 'список ключей') {
-                console.log(`[onMessage] Выполняется команда 'список ключей' администратором`);
                 await getKeysFromDatabase(bot, chatId);
+                console.log(`[11] Список ключей отправлен администратору ID ${userId}`);
             } else if (command === 'список пользователей с ключами') {
-                console.log(`[onMessage] Выполняется команда 'список пользователей с ключами' администратором`);
                 await getUsersWithKeys(bot, chatId);
-            } else if (command === 'инструкция') {
-                console.log(`[onMessage] Выполняется команда 'инструкция' для пользователя ID = ${userId}`);
-                await sendSafeMessage(bot, chatId, 'Выберите версию программы для скачивания:', {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [
-                                { text: 'Скачать для iOS', url: 'https://itunes.apple.com/us/app/outline-app/id1356177741' },
-                                { text: 'Скачать для Android', url: 'https://play.google.com/store/apps/details?id=org.outline.android.client' }
-                            ],
-                            [
-                                { text: 'Скачать для Windows', url: 'https://s3.amazonaws.com/outline-releases/client/windows/stable/Outline-Client.exe' },
-                                { text: 'Скачать для macOS', url: 'https://itunes.apple.com/us/app/outline-app/id1356177741?mt=12' }
-                            ],
-                            [
-                                { text: 'Тех поддержка', url: 'https://t.me/bagamedovit' }
-                            ]
-                        ]
-                    }
-                });
-                console.log(`[onMessage] Кнопки для скачивания отправлены пользователю ID = ${userId}`);
-            } else {
-                await sendSafeMessage(bot, chatId, "Неизвестная команда администратора.");
+                console.log(`[12] Список пользователей с ключами отправлен администратору ID ${userId}`);
             }
         } else {
-            // Команды для обычных пользователей
             if (command === 'запросить ключ') {
-                console.log(`[onMessage] Пользователь запросил ключ`);
-                await sendSafeMessage(bot, chatId, 'Ваш запрос отправлен администратору на подтверждение.');
+                console.log(`[13] Пользователь ${userId} запросил создание ключа`);
+                await bot.sendMessage(chatId, 'Ваш запрос отправлен администратору на подтверждение.');
 
-                // Отправляем уведомление администратору
                 await bot.sendMessage(adminId, `Пользователь ID ${userId} запросил создание ключа. Подтвердите запрос.`, {
                     reply_markup: {
                         inline_keyboard: [
@@ -122,9 +91,10 @@ bot.on('message', async (msg) => {
                         ]
                     }
                 });
+                console.log(`[14] Запрос на создание ключа отправлен администратору от пользователя ID ${userId}`);
             } else if (command === 'инструкция') {
-                console.log(`[onMessage] Выполняется команда 'инструкция' для пользователя ID = ${userId}`);
-                await sendSafeMessage(bot, chatId, 'Выберите версию программы для скачивания:', {
+                console.log(`[15] Пользователь ${userId} запросил инструкцию`);
+                await bot.sendMessage(chatId, 'Выберите версию программы для скачивания:', {
                     reply_markup: {
                         inline_keyboard: [
                             [
@@ -141,47 +111,80 @@ bot.on('message', async (msg) => {
                         ]
                     }
                 });
-                console.log(`[onMessage] Кнопки для скачивания отправлены пользователю ID = ${userId}`);
-            } else {
-                await sendSafeMessage(bot, chatId, "Неизвестная команда.");
+                console.log(`[16] Инструкция отправлена пользователю ID ${userId}`);
             }
         }
     } catch (error) {
-        console.error(`[onMessage] Ошибка: ${error}`);
-        await sendSafeMessage(bot, chatId, "Произошла ошибка. Попробуйте позже.");
+        console.error(`[Error] Ошибка в обработчике команды для пользователя ID ${userId}:`, error);
+        await bot.sendMessage(chatId, "Произошла ошибка. Попробуйте позже.");
     }
 });
 
-// Обработчик callback_query для выбора сервера и создания ключа
+// Обработчик callback_query для подтверждения создания ключа
 bot.on('callback_query', async (callbackQuery) => {
     const data = callbackQuery.data;
     const chatId = callbackQuery.message.chat.id;
-    const userId = callbackQuery.from.id;
 
-    if (data.startsWith('confirm_create_key_')) {
-        const requestedUserId = parseInt(data.split('confirm_create_key_')[1], 10);
+    console.log(`[17] Обработка callback_query: ${data}`);
 
-        console.log(`[callback_query] Администратор подтвердил запрос на создание ключа для пользователя ID ${requestedUserId}`);
-        await bot.sendMessage(requestedUserId, 'Ваш запрос на создание ключа подтвержден. Выберите сервер для создания ключа:');
-        await showServerSelection(bot, requestedUserId);
-
-    } else if (data.startsWith('decline_create_key_')) {
-        const requestedUserId = parseInt(data.split('decline_create_key_')[1], 10);
-
-        console.log(`[callback_query] Администратор отклонил запрос на создание ключа для пользователя ID ${requestedUserId}`);
-        await bot.sendMessage(requestedUserId, 'Ваш запрос на создание ключа отклонен администратором.');
-
-    } else if (data.startsWith('select_server_')) {
+    // Проверка выбора сервера пользователем
+    if (data.startsWith('select_server_')) {
         const serverName = data.split('select_server_')[1];
         const selectedServer = servers.find(server => server.name === serverName);
 
         if (!selectedServer) {
-            console.log("[callback_query] Ошибка: выбранный сервер не найден.");
+            console.log("[18] Ошибка: выбранный сервер не найден.");
             await bot.sendMessage(chatId, "Ошибка при выборе сервера. Попробуйте снова.");
             return;
         }
 
-        console.log(`[callback_query] Пользователь выбрал сервер: ${selectedServer.name} с URL: ${selectedServer.apiUrl}`);
-        await createAndSendKey(bot, userId, chatId, selectedServer.name, selectedServer.apiUrl, selectedServer.name);
+        console.log(`[19] Пользователь выбрал сервер: ${selectedServer.name} с URL: ${selectedServer.apiUrl}`);
+
+        // Отправляем уведомление администратору для подтверждения
+        await bot.sendMessage(adminId, `Пользователь с ID ${chatId} выбрал сервер "${selectedServer.name}". Подтвердите создание ключа.`, {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: 'Подтвердить', callback_data: `approve_key_${chatId}_${selectedServer.name}` }],
+                    [{ text: 'Отклонить', callback_data: `decline_key_${chatId}` }]
+                ]
+            }
+        });
+        console.log(`[20] Уведомление администратору отправлено для подтверждения`);
+
+        await bot.sendMessage(chatId, 'Ваш запрос на создание ключа отправлен администратору для подтверждения.');
+    }
+
+    // Обработка подтверждения администратором
+    if (data.startsWith('approve_key_')) {
+        console.log("[21] Начало обработки подтверждения ключа");
+
+        const parts = data.split('_');
+        if (parts.length < 3) {
+            console.log("[22] Ошибка: некорректные данные в callback_query");
+            await bot.sendMessage(adminId, "Ошибка: некорректные данные в запросе.");
+            return;
+        }
+
+        const requestedUserId = parts[2];
+        const serverName = parts.slice(3).join('_');  // Используем join для поддержки имен серверов с подчеркиваниями
+        const selectedServer = servers.find(server => server.name === serverName);
+
+        if (!selectedServer) {
+            console.log(`[23] Ошибка: выбранный сервер "${serverName}" не найден.`);
+            await bot.sendMessage(adminId, "Ошибка: выбранный сервер не найден.");
+            return;
+        }
+
+        console.log(`[24] Администратор подтвердил создание ключа для пользователя ID ${requestedUserId} на сервере ${serverName}`);
+
+        // Создание и отправка ключа
+        try {
+            await createAndSendKey(bot, parseInt(requestedUserId, 10), parseInt(requestedUserId, 10), selectedServer.name, selectedServer.apiUrl, selectedServer.name, adminId);
+            console.log(`[25] Ключ создан и отправлен пользователю ID ${requestedUserId}`);
+            await bot.sendMessage(adminId, `Ключ для пользователя ID ${requestedUserId} успешно создан и отправлен.`);
+        } catch (error) {
+            console.error(`[26] Ошибка при создании ключа для пользователя ID ${requestedUserId}:`, error);
+            await bot.sendMessage(adminId, "Ошибка при создании ключа. Попробуйте позже.");
+        }
     }
 });

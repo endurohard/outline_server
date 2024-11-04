@@ -54,25 +54,85 @@ bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const command = msg.text?.trim().toLowerCase();
-    const isAdminUser = userId.toString() === adminId;
+    const isAdminUser = userId.toString() === adminId; // Проверка администратора
 
     console.log(`[onMessage] Получена команда: ${command} от пользователя ID ${userId}`);
 
     try {
+        // Вызов `showMainKeyboard` при командах `/start` или `/menu` для показа клавиатуры
+        if (command === '/start' || command === '/menu') {
+            console.log(`[onMessage] Отображение главной клавиатуры`);
+            await bot.sendMessage(chatId, 'Добро пожаловать! Чем могу помочь?');
+            showMainKeyboard(bot, chatId, isAdminUser); // Показываем клавиатуру
+            await saveClient(userId, msg.from.username || msg.from.first_name || 'Неизвестный');
+        }
+
         if (isAdminUser) {
+            // Команды администратора
             if (command === 'создать ключ') {
-                console.log(`[onMessage] Выполняется команда 'создать ключ'`);
+                console.log(`[onMessage] Выполняется команда 'создать ключ' администратором`);
                 await sendSafeMessage(bot, chatId, 'Выберите сервер для создания ключа:');
-                await showServerSelection(bot, chatId);  // Вызов функции выбора сервера
+                await showServerSelection(bot, chatId);
             } else if (command === 'список пользователей') {
-                console.log(`[onMessage] Выполняется команда 'список пользователей'`);
+                console.log(`[onMessage] Выполняется команда 'список пользователей' администратором`);
                 await getUsers(bot, chatId);
             } else if (command === 'список ключей') {
-                console.log(`[onMessage] Выполняется команда 'список ключей'`);
+                console.log(`[onMessage] Выполняется команда 'список ключей' администратором`);
                 await getKeysFromDatabase(bot, chatId);
             } else if (command === 'список пользователей с ключами') {
-                console.log(`[onMessage] Выполняется команда 'список пользователей с ключами'`);
+                console.log(`[onMessage] Выполняется команда 'список пользователей с ключами' администратором`);
                 await getUsersWithKeys(bot, chatId);
+            } else if (command === 'инструкция') {
+                console.log(`[onMessage] Выполняется команда 'инструкция' для пользователя ID = ${userId}`);
+                await sendSafeMessage(bot, chatId, 'Выберите версию программы для скачивания:', {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                { text: 'Скачать для iOS', url: 'https://itunes.apple.com/us/app/outline-app/id1356177741' },
+                                { text: 'Скачать для Android', url: 'https://play.google.com/store/apps/details?id=org.outline.android.client' }
+                            ],
+                            [
+                                { text: 'Скачать для Windows', url: 'https://s3.amazonaws.com/outline-releases/client/windows/stable/Outline-Client.exe' },
+                                { text: 'Скачать для macOS', url: 'https://itunes.apple.com/us/app/outline-app/id1356177741?mt=12' }
+                            ],
+                            [
+                                { text: 'Тех поддержка', url: 'https://t.me/bagamedovit' }  // Замените на сайт, если нужно
+                            ]
+                        ]
+                    }
+                });
+                console.log(`[onMessage] Кнопки для скачивания отправлены пользователю ID = ${userId}`);
+            } else {
+                await sendSafeMessage(bot, chatId, "Неизвестная команда администратора.");
+            }
+        } else {
+            // Команды для обычных пользователей
+            if (command === 'запросить ключ') {
+                console.log(`[onMessage] Пользователь запросил ключ`);
+                await sendSafeMessage(bot, chatId, 'Выберите сервер для запроса ключа:');
+                await showServerSelection(bot, chatId);
+            } else if (command === 'инструкция') {
+                console.log(`[onMessage] Выполняется команда 'инструкция' для пользователя ID = ${userId}`);
+                await sendSafeMessage(bot, chatId, 'Выберите версию программы для скачивания:', {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                { text: 'Скачать для iOS', url: 'https://itunes.apple.com/us/app/outline-app/id1356177741' },
+                                { text: 'Скачать для Android', url: 'https://play.google.com/store/apps/details?id=org.outline.android.client' }
+                            ],
+                            [
+                                { text: 'Скачать для Windows', url: 'https://s3.amazonaws.com/outline-releases/client/windows/stable/Outline-Client.exe' },
+                                { text: 'Скачать для macOS', url: 'https://itunes.apple.com/us/app/outline-app/id1356177741?mt=12' }
+                            ],
+                            [
+                                { text: 'Тех поддержка', url: 'https://t.me/bagamedovit' }  // Замените на сайт, если нужно
+                            ]
+                        ]
+                    }
+                });
+                console.log(`[onMessage] Кнопки для скачивания отправлены пользователю ID = ${userId}`);
+            } else {
+                await sendSafeMessage(bot, chatId, "Неизвестная команда администратора.");
             }
         }
     } catch (error) {

@@ -1,6 +1,5 @@
 const db = require('../db');
 const { getKeysFromDatabase } = require('./getKeysFromDatabase'); // Импорт функции из файла
-const pendingPaymentRequests = {}; // Временное хранилище для запросов реквизитов
 
 // Функция для проверки прав администратора
 function isAdmin(userId) {
@@ -17,6 +16,7 @@ async function sendLongMessage(bot, chatId, message, chunkSize = 4000) {
     }
 }
 
+// Функция для получения списка пользователей с их ключами
 async function getUsersWithKeys(bot, chatId) {
     console.log(`[73] Запрос списка пользователей с ключами от администратора ID = ${chatId}`);
     try {
@@ -58,6 +58,7 @@ async function getUsersWithKeys(bot, chatId) {
     }
 }
 
+// Функция для получения списка всех пользователей
 async function getUsers(bot, chatId) {
     console.log(`[79] Запрос списка пользователей от администратора ID = ${chatId}`);
     try {
@@ -79,30 +80,53 @@ async function getUsers(bot, chatId) {
     }
 }
 
-// Функция для отправки реквизитов для оплаты
-async function requestPaymentDetails(bot, chatId, clientChatId, userName) {
-    console.log(`[83] Запрос реквизитов для оплаты от администратора ID = ${chatId} для пользователя ${userName}`);
-    pendingPaymentRequests[chatId] = { clientChatId, userName };
-    await bot.sendMessage(chatId, `Пожалуйста, отправьте реквизиты для оплаты для @${userName}`);
+// Функция для запроса реквизитов для оплаты
+async function requestPaymentDetails(bot, adminChatId, clientChatId, userName, pendingPaymentRequests) {
+    const requestKey = `${adminChatId}_${clientChatId}`;
+    console.log(`[83] Запрос реквизитов для оплаты от администратора ID = ${adminChatId} для пользователя ID ${clientChatId}`);
+
+    // Добавляем запрос на оплату в pendingPaymentRequests с уникальным ключом
+    pendingPaymentRequests[requestKey] = { clientChatId, userName };
+    console.log('[DEBUG] pendingPaymentRequests после добавления запроса:', JSON.stringify(pendingPaymentRequests, null, 2));
+
+    // Отправка сообщения администратору с просьбой отправить реквизиты
+    await bot.sendMessage(adminChatId, `Пожалуйста, отправьте реквизиты для оплаты для @${userName}`);
 }
 
-// Обработчик текстовых сообщений от администратора для отправки реквизитов
-async function handleAdminPaymentMessage(bot, msg) {
-    console.log(`[84] Обработка сообщения администратора с реквизитами для оплаты ID = ${msg.from.id}`);
+async function handleAdminPaymentMessage(bot, msg, pendingPaymentRequests) {
     const adminId = msg.from.id;
-    const paymentRequest = pendingPaymentRequests[adminId];
+
+    const requestKey = Object.keys(pendingPaymentRequests).find(key => key.startsWith(`${adminId}_`));
+    const paymentRequest = pendingPaymentRequests[requestKey];
+
     if (!paymentRequest) {
-        console.log('[85] Запрос на реквизиты для оплаты не найден');
+        console.log('[DEBUG] Запрос на реквизиты для оплаты не найден');
+        await bot.sendMessage(adminId, "Запрос на реквизиты не найден.");
         return;
     }
 
     const { clientChatId, userName } = paymentRequest;
     const paymentDetails = msg.text;
 
-    console.log(`[86] Отправка реквизитов для оплаты пользователю ID = ${clientChatId}`);
-    await bot.sendMessage(clientChatId, `Пожалуйста, произведите оплату. Реквизиты от администратора:\n${paymentDetails}`);
-    delete pendingPaymentRequests[adminId];
-    console.log('[87] Запрос на реквизиты для оплаты завершен и удален');
+    console.log(`[DEBUG] Отправка реквизитов для оплаты пользователю ID = ${clientChatId}`);
+
+    try {
+        await bot.sendMessage(clientChatId, `Пожалуйста, произведите оплату. Реквизиты от администратора:\n${paymentDetails}`, {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: 'Оплатил', callback_data: `payment_confirmed_${clientChatId}` }]
+                ]
+            }
+        });
+        console.log(`[DEBUG] Сообщение об оплате отправлено пользователю ID = ${clientChatId}`);
+
+        // Удаление запроса после отправки
+        delete pendingPaymentRequests[requestKey];
+        console.log('[DEBUG] Запрос на реквизиты для оплаты удален');
+    } catch (error) {
+        console.error('[Error] Ошибка при отправке реквизитов пользователю:', error);
+    }
 }
 
+// Экспортируем функцию
 module.exports = { getUsersWithKeys, getUsers, getKeysFromDatabase, requestPaymentDetails, handleAdminPaymentMessage };

@@ -15,6 +15,8 @@ services:
       - ${POSTGRES_DATA_PATH}:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
     restart: unless-stopped
+    networks:
+      - bot-network
 
   telegram-bot:
     depends_on:
@@ -27,3 +29,8 @@ services:
     volumes:
       - .:/usr/src/app
     restart: unless-stopped
+    networks:
+      - bot-network
+
+networks:
+  bot-network:

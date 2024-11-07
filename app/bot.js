@@ -64,8 +64,60 @@ bot.on('message', async (msg) => {
     let command = msg.text ? msg.text.trim().toLowerCase() : null;
 
     console.log(`[5] Получена команда: ${command || 'не команда'} от пользователя ID ${userId}`);
-
     try {
+        if (isAdminUser && command === 'список ключей') {
+            try {
+                console.log(`[64] Вызов функции getKeysFromDatabase`);
+                const keys = await getKeysFromDatabase(); // Получаем ключи из базы данных
+                console.log(`[65] Получено ${keys.length} ключей из базы данных`);
+
+                if (keys.length > 0) {
+                    const chunkSize = 10; // Количество ключей в одном сообщении
+                    for (let i = 0; i < keys.length; i += chunkSize) {
+                        const chunk = keys.slice(i, i + chunkSize);
+                        let message = 'Список ключей:\n';
+                        chunk.forEach((key, index) => {
+                            message += `${i + index + 1}. ${key.name} - ${key.server}\n`;
+                        });
+                        await bot.sendMessage(chatId, message);
+                    }
+                } else {
+                    await bot.sendMessage(chatId, 'Нет доступных ключей.');
+                }
+            } catch (error) {
+                console.error(`[Error] Ошибка получения списка ключей:`, error);
+                await bot.sendMessage(chatId, 'Не удалось получить список ключей. Попробуйте позже.');
+            }
+            return;
+        }
+
+        if (isAdminUser && command === 'создать ключ') {
+            await bot.sendMessage(chatId, 'Админ может создать ключ.');
+
+            // Обновляем список доступных серверов перед их отображением
+            await monitorServers(bot, adminId);
+
+            if (availableServers.length > 0) {
+                const buttons = availableServers.map(server => [
+                    { text: server.name, callback_data: `select_server_${server.name}` }
+                ]);
+
+                await bot.sendMessage(chatId, 'Выберите сервер для создания ключа:', {
+                    reply_markup: { inline_keyboard: buttons }
+                });
+            } else {
+                await bot.sendMessage(chatId, 'Нет доступных серверов для создания ключа.');
+            }
+
+            return;
+        }
+
+        if (command === 'запросить ключ') {
+            await monitorServers(bot, adminId);
+            await showServerSelection(bot, chatId, availableServers);
+            return;
+        }
+
         if (msg.photo) {
             console.log(`[50] Получена квитанция (фото) от пользователя ID ${userId}`);
             const fileId = msg.photo[msg.photo.length - 1].file_id;
@@ -104,24 +156,6 @@ bot.on('message', async (msg) => {
             await bot.sendMessage(chatId, 'Добро пожаловать! Чем могу помочь?');
             showMainKeyboard(bot, chatId, isAdminUser);
             await saveClient(userId, msg.from.username || msg.from.first_name || 'Неизвестный');
-        } else if (isAdminUser && command.startsWith('альфа-банк')) {
-            const requestKey = Object.keys(pendingPaymentRequests).find(key => key.startsWith(`${adminId}_`));
-            const paymentRequest = pendingPaymentRequests[requestKey];
-
-            if (paymentRequest) {
-                const clientChatId = paymentRequest.clientChatId;
-                await bot.sendMessage(clientChatId, `Необходимо оплатить: ${command}`, {
-                    reply_markup: {
-                        inline_keyboard: [[{ text: 'Оплатил', callback_data: `payment_confirmed_${clientChatId}` }]]
-                    }
-                });
-                delete pendingPaymentRequests[requestKey];
-            } else {
-                await bot.sendMessage(chatId, 'Нет активных запросов на оплату.');
-            }
-        } else if (command === 'запросить ключ') {
-            await monitorServers(bot, adminId); // Мониторинг обновит availableServers
-            await showServerSelection(bot, chatId, availableServers); // Передаем актуальный список доступных серверов
         } else {
             await bot.sendMessage(chatId, "Команда не распознана. Пожалуйста, отправьте команду или квитанцию.");
         }
@@ -147,8 +181,22 @@ bot.on('callback_query', async (callbackQuery) => {
             return;
         }
 
-        pendingKeyRequests[userId] = { server: selectedServer };
-        await requestPaymentDetails(bot, adminId, userId, callbackQuery.from.username || `ID ${userId}`, pendingPaymentRequests);
+        // Если пользователь администратор, сразу создаем ключ
+        if (userId.toString() === adminId) {
+            try {
+                console.log(`[22] Администратор выбрал сервер: ${serverName}`);
+                await createAndSendKey(bot, userId, userId, selectedServer.name, selectedServer.apiUrl, selectedServer.name, adminId);
+                await bot.sendMessage(userId, "Ключ успешно создан.");
+            } catch (error) {
+                console.error(`[Error] Ошибка создания ключа для администратора ID ${userId}:`, error);
+                await bot.sendMessage(userId, 'Произошла ошибка при создании ключа. Попробуйте позже.');
+            }
+        } else {
+            // Для обычных пользователей инициируем процесс оплаты
+            pendingKeyRequests[userId] = { server: selectedServer };
+            await bot.sendMessage(userId, `Вы выбрали сервер "${selectedServer.name}". Ожидайте реквизитов для оплаты от администратора.`);
+            await requestPaymentDetails(bot, adminId, userId, callbackQuery.from.username || `ID ${userId}`, pendingPaymentRequests);
+        }
     } else if (data.startsWith('payment_confirmed_')) {
         const clientChatId = data.split('payment_confirmed_')[1];
         await bot.sendMessage(clientChatId, "Отправьте фото или документ квитанции для подтверждения оплаты.");

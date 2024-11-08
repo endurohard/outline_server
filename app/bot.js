@@ -3,7 +3,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const { Pool } = require('pg');
 const { saveClient } = require('../functions/clientFunctions');
 const { createAndSendKey } = require('../functions/keyFunctions');
-const { getUsersWithKeys, getUsers, requestPaymentDetails, handleAdminPaymentMessage } = require('../functions/adminFunctions');
+const { getUsersWithKeys, getUsers, requestPaymentDetails, handleAdminPaymentMessage, forwardReceipt } = require('../functions/adminFunctions');
 const getServersFromEnv = require('../functions/generateServers');
 const { monitorServers } = require('../functions/serverMonitor');
 const getKeysFromDatabase = require('../functions/getKeysFromDatabase');
@@ -61,104 +61,75 @@ bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const isAdminUser = userId.toString() === adminId;
-    let command = msg.text ? msg.text.trim().toLowerCase() : null;
+    const command = msg.text ? msg.text.trim().toLowerCase() : null;
 
-    console.log(`[5] Получена команда: ${command || 'не команда'} от пользователя ID ${userId}`);
+    console.log(`[5] Получена команда: ${command || 'не команда'} от пользователя ID ${userId} (Chat ID: ${chatId})`);
+
     try {
-        if (isAdminUser && command === 'список ключей') {
-            try {
+        // Обработка команд администратора
+        if (isAdminUser) {
+            console.log(`[INFO] Администратор отправил сообщение: ${msg.text}`);
+
+            // Обработка платежных сообщений
+            await handleAdminPaymentMessage(bot, msg, pendingPaymentRequests);
+
+            if (command === 'список ключей') {
                 console.log(`[64] Вызов функции getKeysFromDatabase`);
-                const keys = await getKeysFromDatabase(); // Получаем ключи из базы данных
-                console.log(`[65] Получено ${keys.length} ключей из базы данных`);
+                await getKeysFromDatabaseAndSend(bot, chatId);
+                return;
+            }
 
-                if (keys.length > 0) {
-                    const chunkSize = 10; // Количество ключей в одном сообщении
-                    for (let i = 0; i < keys.length; i += chunkSize) {
-                        const chunk = keys.slice(i, i + chunkSize);
-                        let message = 'Список ключей:\n';
-                        chunk.forEach((key, index) => {
-                            message += `${i + index + 1}. ${key.name} - ${key.server}\n`;
-                        });
-                        await bot.sendMessage(chatId, message);
-                    }
+            if (command === 'создать ключ') {
+                console.log(`[INFO] Администратор запросил создание ключа`);
+
+                // Обновляем список доступных серверов
+                await monitorServers(bot, adminId);
+
+                if (availableServers.length > 0) {
+                    const buttons = availableServers.map(server => [
+                        { text: server.name, callback_data: `select_server_${server.name}` }
+                    ]);
+
+                    await bot.sendMessage(chatId, 'Выберите сервер для создания ключа:', {
+                        reply_markup: { inline_keyboard: buttons }
+                    });
                 } else {
-                    await bot.sendMessage(chatId, 'Нет доступных ключей.');
+                    await bot.sendMessage(chatId, 'Нет доступных серверов для создания ключа.');
                 }
-            } catch (error) {
-                console.error(`[Error] Ошибка получения списка ключей:`, error);
-                await bot.sendMessage(chatId, 'Не удалось получить список ключей. Попробуйте позже.');
+                return;
             }
             return;
         }
 
-        if (isAdminUser && command === 'создать ключ') {
-            await bot.sendMessage(chatId, 'Админ может создать ключ.');
-
-            // Обновляем список доступных серверов перед их отображением
-            await monitorServers(bot, adminId);
-
-            if (availableServers.length > 0) {
-                const buttons = availableServers.map(server => [
-                    { text: server.name, callback_data: `select_server_${server.name}` }
-                ]);
-
-                await bot.sendMessage(chatId, 'Выберите сервер для создания ключа:', {
-                    reply_markup: { inline_keyboard: buttons }
-                });
-            } else {
-                await bot.sendMessage(chatId, 'Нет доступных серверов для создания ключа.');
-            }
-
-            return;
-        }
-
+        // Обработка пользовательских команд
         if (command === 'запросить ключ') {
-            await monitorServers(bot, adminId);
-            await showServerSelection(bot, chatId, availableServers);
+            console.log(`[INFO] Пользователь ID ${userId} запросил ключ`);
+            await showServerSelection(bot, chatId);
             return;
         }
 
         if (msg.photo) {
             console.log(`[50] Получена квитанция (фото) от пользователя ID ${userId}`);
-            const fileId = msg.photo[msg.photo.length - 1].file_id;
-            await bot.sendPhoto(adminId, fileId, {
-                caption: `Клиент ID ${userId} отправил квитанцию об оплате.`
-            });
-            await bot.sendMessage(adminId, `Подтвердите или отклоните платеж для клиента ID ${userId}:`, {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'Подтвердить оплату', callback_data: `approve_payment_${userId}` }],
-                        [{ text: 'Отклонить оплату', callback_data: `decline_payment_${userId}` }]
-                    ]
-                }
-            });
+            await forwardReceipt(bot, msg, userId, adminId);
             return;
         }
 
         if (msg.document) {
             console.log(`[52] Получен документ от пользователя ID ${userId}`);
-            const fileId = msg.document.file_id;
-            await bot.sendDocument(adminId, fileId, {
-                caption: `Клиент ID ${userId} отправил документ об оплате.`
-            });
-            await bot.sendMessage(adminId, `Подтвердите или отклоните платеж для клиента ID ${userId}:`, {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'Подтвердить оплату', callback_data: `approve_payment_${userId}` }],
-                        [{ text: 'Отклонить оплату', callback_data: `decline_payment_${userId}` }]
-                    ]
-                }
-            });
+            await forwardDocument(bot, msg, userId, adminId);
             return;
         }
 
         if (command === '/start' || command === '/menu') {
+            console.log(`[INFO] Пользователь ID ${userId} вызвал команду ${command}`);
             await bot.sendMessage(chatId, 'Добро пожаловать! Чем могу помочь?');
             showMainKeyboard(bot, chatId, isAdminUser);
             await saveClient(userId, msg.from.username || msg.from.first_name || 'Неизвестный');
-        } else {
-            await bot.sendMessage(chatId, "Команда не распознана. Пожалуйста, отправьте команду или квитанцию.");
+            return;
         }
+
+        console.warn(`[Warning] Команда "${command}" не распознана для пользователя ID ${userId}`);
+        await bot.sendMessage(chatId, 'Команда не распознана. Пожалуйста, отправьте команду или квитанцию.');
     } catch (error) {
         console.error(`[Error] Ошибка обработки команды:`, error);
         await bot.sendMessage(chatId, 'Произошла ошибка. Попробуйте позже.');

@@ -128,5 +128,29 @@ async function handleAdminPaymentMessage(bot, msg, pendingPaymentRequests) {
     }
 }
 
+async function forwardReceipt(bot, msg, userId, adminId) {
+    try {
+        const fileId = msg.photo[msg.photo.length - 1].file_id;
+        await bot.sendPhoto(adminId, fileId, {
+            caption: `Клиент ID ${userId} отправил квитанцию об оплате.`
+        });
+
+        await bot.sendMessage(adminId, `Подтвердите или отклоните платеж для клиента ID ${userId}:`, {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: 'Подтвердить оплату', callback_data: `approve_payment_${userId}` }],
+                    [{ text: 'Отклонить оплату', callback_data: `decline_payment_${userId}` }]
+                ]
+            }
+        });
+
+        console.log(`[INFO] Квитанция от клиента ID ${userId} переслана админу ID ${adminId}`);
+    } catch (error) {
+        console.error(`[Error] Ошибка пересылки квитанции от клиента ID ${userId}:`, error);
+        await bot.sendMessage(userId, 'Произошла ошибка при отправке квитанции. Пожалуйста, попробуйте позже.');
+    }
+}
+
+
 // Экспортируем функцию
-module.exports = { getUsersWithKeys, getUsers, getKeysFromDatabase, requestPaymentDetails, handleAdminPaymentMessage };
+module.exports = { getUsersWithKeys, getUsers, forwardReceipt, getKeysFromDatabase, requestPaymentDetails, handleAdminPaymentMessage };

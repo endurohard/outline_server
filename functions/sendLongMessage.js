@@ -1,17 +1,18 @@
 async function sendLongMessage(bot, chatId, message, chunkSize = 4000) {
-    console.log('[51] Вызов функции sendLongMessage');
-    console.log(`[52] chatId: ${chatId}, длина сообщения: ${message.length}, размер чанка: ${chunkSize}`);
+    if (!bot || !chatId) {
+        console.error('[ERROR] Bot или chatId не определены');
+        return;
+    }
 
-    const messageChunks = message.match(new RegExp(`.{1,${chunkSize}}`, 'g')); // Разбивает на куски по 4000 символов
-    console.log(`[53] Количество чанков для отправки: ${messageChunks.length}`);
+    const messageChunks = message.match(new RegExp(`.{1,${chunkSize}}`, 'g')) || [];
+    console.log(`[52] chatId: ${chatId}, длина сообщения: ${message.length}, количество чанков: ${messageChunks.length}`);
 
-    for (const [index, chunk] of messageChunks.entries()) {
-        console.log(`[54] Отправка чанка ${index + 1} из ${messageChunks.length}`);
+    for (let i = 0; i < messageChunks.length; i++) {
         try {
-            await bot.sendMessage(chatId, chunk);
-            console.log(`[55] Чанк ${index + 1} отправлен успешно`);
+            await bot.sendMessage(chatId, messageChunks[i]);
+            console.log(`[54] Успешно отправлен чанк ${i + 1} из ${messageChunks.length}`);
         } catch (error) {
-            console.error(`[56] Ошибка при отправке чанка ${index + 1}:`, error);
+            console.error(`[56] Ошибка при отправке чанка ${i + 1}:`, error);
         }
     }
 }

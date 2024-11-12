@@ -13,10 +13,16 @@ async function addTemplate(name, details) {
 }
 
 // Удаление шаблона по имени
-async function deleteTemplate(name) {
-    await db.query('DELETE FROM templates WHERE name = $1', [name]);
-    console.log(`[INFO] Шаблон "${name}" успешно удалён.`);
+async function deleteTemplateById(templateId) {
+    try {
+        await db.query('DELETE FROM templates WHERE id = $1', [templateId]);
+        console.log(`[INFO] Шаблон с ID ${templateId} успешно удалён.`);
+    } catch (error) {
+        console.error(`[Error] Ошибка при удалении шаблона с ID ${templateId}:`, error);
+        throw error;
+    }
 }
+
 
 // Отображение клавиатуры шаблонов
 async function showTemplatesKeyboard(bot, chatId) {
@@ -44,6 +50,6 @@ async function showTemplatesKeyboard(bot, chatId) {
 module.exports = {
     getTemplates,
     addTemplate,
-    deleteTemplate,
+    deleteTemplateById,
     showTemplatesKeyboard,
 };

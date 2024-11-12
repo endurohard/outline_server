@@ -6,9 +6,9 @@ const { showMainKeyboard } = require('../functions/showMainKeyboard');
 const { saveClient } = require('../functions/clientFunctions');
 const getKeysFromDatabase = require('../functions/getKeysFromDatabase');
 const { monitorServers, getAvailableServers } = require('../functions/serverMonitor');
-const { getTemplates, showTemplatesKeyboard, addTemplate, deleteTemplate } = require('../functions/templatesFunctions');
+const { getTemplates, showTemplatesKeyboard, addTemplate, deleteTemplateById } = require('../functions/templatesFunctions');
 const { createAndSendKey } = require('../functions/keyFunctions');
-const { requestPaymentDetails, forwardReceipt } = require('../functions/adminFunctions');
+const { requestPaymentDetails, forwardReceipt, getUsers } = require('../functions/adminFunctions');
 
 const token = process.env.TELEGRAM_TOKEN;
 const adminId = process.env.ADMIN_ID?.toString();
@@ -61,7 +61,15 @@ bot.on('message', async (msg) => {
 
     console.log(`[5] Получена команда: ${command || 'не команда'} от пользователя ID ${userId} (Chat ID: ${chatId})`);
 
-    try {
+    async function sendSafeMessage(bot, chatId, text, options = {}) {
+        try {
+            await bot.sendMessage(chatId, text, options);
+        } catch (error) {
+            console.error(`[Error] Ошибка отправки сообщения:`, error);
+        }
+    }
+
+    try {sendSafeMessage
         if (command === '/start' || command === '/menu') {
             console.log(`[INFO] Команда ${command} от пользователя ID ${userId}`);
             await bot.sendMessage(chatId, 'Добро пожаловать! Чем могу помочь?');
@@ -70,6 +78,28 @@ bot.on('message', async (msg) => {
             await showMainKeyboard(bot, chatId, isAdminUser);
 
             await saveClient(userId, msg.from.username || msg.from.first_name || 'Неизвестный');
+            return;
+        }
+
+        if (command === 'инструкция') {
+            console.log(`[onMessage] Выполняется команда 'инструкция' для пользователя ID = ${userId}`);
+            await sendSafeMessage(bot, chatId, 'Выберите версию программы для скачивания:', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: 'Скачать для iOS', url: 'https://itunes.apple.com/us/app/outline-app/id1356177741' },
+                            { text: 'Скачать для Android', url: 'https://play.google.com/store/apps/details?id=org.outline.android.client' }
+                        ],
+                        [
+                            { text: 'Скачать для Windows', url: 'https://s3.amazonaws.com/outline-releases/client/windows/stable/Outline-Client.exe' },
+                            { text: 'Скачать для macOS', url: 'https://itunes.apple.com/us/app/outline-app/id1356177741?mt=12' }
+                        ],
+                        [
+                            { text: 'Тех поддержка', url: 'https://t.me/bagamedovit' }
+                        ]
+                    ]
+                }
+            });
             return;
         }
 
@@ -92,7 +122,14 @@ bot.on('message', async (msg) => {
             }
 
             switch (command) {
+
+                case 'список пользователей':
+                    console.log(`[INFO] Администратор отправил сообщение: ${command}`);
+                    await getUsers(bot, chatId);
+                    break;
+
                 case 'список ключей':
+                    console.log(`[INFO] Администратор отправил сообщение: ${command}`);
                     await getKeysFromDatabase(bot, chatId);
                     break;
 
@@ -153,6 +190,14 @@ bot.on('callback_query', async (callbackQuery) => {
                 return;
             }
 
+            // Если админ просто хочет просмотреть шаблон
+            if (userId.toString() === adminId) {
+                await bot.sendMessage(chatId, `Шаблон "${selectedTemplate.name}":\n\n${selectedTemplate.details}`);
+                console.log(`[INFO] Администратор просмотрел шаблон "${selectedTemplate.name}".`);
+                return;
+            }
+
+            // Если есть активный запрос на реквизиты
             const pendingRequest = Object.keys(pendingPaymentRequests).find(key => key.startsWith(`${adminId}_`));
             if (pendingRequest) {
                 const { clientChatId } = pendingPaymentRequests[pendingRequest];
@@ -208,22 +253,21 @@ bot.on('callback_query', async (callbackQuery) => {
                 await bot.sendMessage(userId, `Вы выбрали сервер "${selectedServer.name}". Ожидайте реквизитов для оплаты.`);
                 await requestPaymentDetails(bot, adminId, userId, callbackQuery.from.username || `ID ${userId}`, pendingPaymentRequests);
             }
+            return;
         }
+
         if (data.startsWith('approve_payment_')) {
             const clientChatId = data.split('approve_payment_')[1];
-
-            // Логика для генерации ключа
             const pendingRequest = pendingKeyRequests[clientChatId];
+
             if (pendingRequest && pendingRequest.server) {
                 const { server } = pendingRequest;
 
                 try {
-                    // Генерация и отправка ключа
                     const key = await createAndSendKey(bot, clientChatId, clientChatId, server.name, server.apiUrl);
                     await bot.sendMessage(clientChatId, `Ваш платеж подтвержден. Вот ваш ключ:\n\n${key}`);
                     await bot.sendMessage(adminId, `Платеж клиента ID ${clientChatId} подтвержден. Ключ успешно выдан.`);
 
-                    // Удаление запроса после выдачи ключа
                     delete pendingKeyRequests[clientChatId];
                     console.log('[INFO] Запрос на ключ удален после подтверждения платежа.');
                 } catch (error) {
@@ -242,13 +286,6 @@ bot.on('callback_query', async (callbackQuery) => {
             await bot.sendMessage(clientChatId, 'Ваш платеж был отклонен. Пожалуйста, свяжитесь с администратором для уточнения.');
             await bot.sendMessage(adminId, `Платеж клиента ID ${clientChatId} отклонен.`);
             delete pendingKeyRequests[clientChatId];
-            return;
-        }
-
-        if (data.startsWith('payment_confirmed_')) {
-            const clientChatId = data.split('payment_confirmed_')[1];
-            await bot.sendMessage(clientChatId, 'Спасибо за подтверждение! Пожалуйста, отправьте фото или документ квитанции для проверки.');
-            await bot.sendMessage(adminId, `Клиент ID ${clientChatId} подтвердил оплату. Ожидается квитанция.`);
             return;
         }
 

@@ -60,26 +60,34 @@ async function getUsersWithKeys(bot, chatId) {
 }
 
 // Функция для получения списка всех пользователей
+// Функция для получения списка пользователей и отправки администратору
 async function getUsers(bot, chatId) {
     console.log(`[79] Запрос списка пользователей от администратора ID = ${chatId}`);
+
     try {
-        const res = await db.query(`SELECT * FROM clients`);
-        let message = 'Список пользователей:\n';
-        if (res.rows.length > 0) {
-            res.rows.forEach(row => {
-                console.log(`[80] Обработка пользователя с ID = ${row.id}`);
-                message += `ID: ${row.id}, Имя: ${row.name}\n`;
-            });
-        } else {
+        const res = await db.query('SELECT id, telegram_id, name FROM clients ORDER BY id');
+        console.log(`[80] Получено ${res.rows.length} пользователей из базы данных`);
+
+        if (res.rows.length === 0) {
             console.log('[81] Нет зарегистрированных пользователей');
-            message = 'Нет зарегистрированных пользователей.';
+            await bot.sendMessage(chatId, 'Нет зарегистрированных пользователей.');
+            return;
         }
+
+        // Формируем сообщение со списком пользователей
+        let message = 'Список пользователей:\n';
+        res.rows.forEach(row => {
+            message += `ID: ${row.id}, Telegram ID: ${row.telegram_id}, Имя: ${row.name || 'Неизвестный'}\n`;
+        });
+
+        console.log('[82] Отправка сообщения с пользователями');
         await bot.sendMessage(chatId, message);
     } catch (err) {
-        console.error('[82] Ошибка получения списка пользователей:', err);
+        console.error('[83] Ошибка при получении списка пользователей:', err);
         await bot.sendMessage(chatId, 'Произошла ошибка при получении списка пользователей.');
     }
 }
+
 
 // Функция для запроса реквизитов
 async function requestPaymentDetails(bot, adminChatId, clientChatId, userName, pendingPaymentRequests) {

@@ -1,6 +1,5 @@
 function showMainKeyboard(bot, chatId, isAdminUser) {
-    console.log('[46] Вызов функции showMainKeyboard');
-    console.log(`[47] chatId: ${chatId}, isAdminUser: ${isAdminUser}`);
+    console.log(`[INFO] Вызов showMainKeyboard: chatId=${chatId}, isAdminUser=${isAdminUser}`);
 
     const options = {
         reply_markup: {
@@ -8,7 +7,7 @@ function showMainKeyboard(bot, chatId, isAdminUser) {
                 ? [
                     [{ text: 'Создать ключ' }, { text: 'Список ключей' }],
                     [{ text: 'Список пользователей' }, { text: 'Список пользователей с ключами' }],
-                    [{ text: 'Инструкция' }]
+                    [{ text: 'Шаблоны' }, { text: 'Инструкция' }]
                 ]
                 : [
                     [{ text: 'Запросить ключ' }],
@@ -19,11 +18,9 @@ function showMainKeyboard(bot, chatId, isAdminUser) {
         }
     };
 
-    console.log('[48] Опции клавиатуры сформированы:', options);
-
     bot.sendMessage(chatId, 'Выберите действие:', options)
-        .then(() => console.log('[49] Сообщение с клавиатурой успешно отправлено'))
-        .catch(error => console.error('[50] Ошибка при отправке сообщения с клавиатурой:', error));
+        .then(() => console.log(`[DEBUG] Клавиатура успешно отправлена пользователю ID: ${chatId}`))
+        .catch(error => console.error('[ERROR] Ошибка отправки клавиатуры:', error));
 }
 
-module.exports = showMainKeyboard;
+module.exports = { showMainKeyboard };

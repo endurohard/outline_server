@@ -60,17 +60,10 @@ async function monitorServers(bot, adminId) {
         }
     }
 }
-
-// Планируем проверку каждые 5 минут
-schedule.scheduleJob('*/5 * * * *', async () => {
-    try {
-        await monitorServers(bot, adminId);
-    } catch (error) {
-        console.error(`[Monitor] Ошибка при выполнении мониторинга: ${error.message}`);
-    }
-});
-
+function getAvailableServers() {
+    return availableServers;
+}
 module.exports = {
     availableServers,
-    monitorServers
+    monitorServers, getAvailableServers
 };

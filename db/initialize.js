@@ -45,10 +45,29 @@ async function initializeDatabase(db) {
             );
     `;
 
+    const createTemplatesTable = `
+        CREATE TABLE IF NOT EXISTS templates (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL UNIQUE,
+            details TEXT NOT NULL
+        );
+    `;
+
+    const createLogsTable = `
+        CREATE TABLE IF NOT EXISTS logs (
+            id SERIAL PRIMARY KEY,
+            action TEXT NOT NULL,
+            user_id BIGINT NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    `;
+
     try {
         await db.query(createClientsTable);
         await db.query(createServersTable);
         await db.query(createKeysTable);
+        await db.query(createTemplatesTable);
+        await db.query(createLogsTable);
 
         console.log("[Database] Таблицы успешно созданы или уже существуют.");
 

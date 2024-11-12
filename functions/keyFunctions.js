@@ -12,7 +12,7 @@ function escapeHTML(text) {
 }
 
 // Функция для создания, сохранения и отправки ключа пользователю
-async function createAndSendKey(bot, userId, chatId, serverName, serverApiUrl, serverEnvName, adminId) {
+async function createAndSendKey(bot, userId, chatId, serverName, serverApiUrl, adminId) {
     console.log(`[22] [createAndSendKey] Начало создания ключа для пользователя ID = ${userId} на сервере ${serverName}`);
 
     if (!userId || !chatId) {
@@ -51,8 +51,8 @@ async function createAndSendKey(bot, userId, chatId, serverName, serverApiUrl, s
         );
         console.log(`[29] [createAndSendKey] Имя ключа установлено через API`);
 
-        // Подставляем домен сервера в ссылку доступа, используя BASE_DOMAIN и имя сервера
-        const domain = `${serverEnvName.toLowerCase()}.${BASE_DOMAIN}`;
+        // Подставляем домен сервера в ссылку доступа, используя BASE_DOMAIN
+        const domain = `${serverName.toLowerCase()}.${BASE_DOMAIN}`;
         const formattedKey = `${accessUrl.replace(/@[^:]+:/, `@${domain}:`)}#RaphaelVPN`;
         console.log(`[30] [createAndSendKey] Сформированный доступный ключ: ${formattedKey}`);
 
@@ -77,11 +77,6 @@ async function createAndSendKey(bot, userId, chatId, serverName, serverApiUrl, s
         }
         console.log(`[34] [createAndSendKey] Ключ для пользователя ID = ${userId} успешно создан и сохранен в базе данных.`);
 
-        if (adminId) {
-            await bot.sendMessage(adminId, `Ключ успешно создан для пользователя ID ${userId} на сервере "${serverName}".`);
-            console.log(`[35] [createAndSendKey] Уведомление отправлено администратору ID = ${adminId}`);
-        }
-
         // Экранируем ключ для HTML
         const escapedKey = escapeHTML(formattedKey);
         console.log(`[36] [createAndSendKey] Экранированный ключ для отправки: ${escapedKey}`);
@@ -89,22 +84,6 @@ async function createAndSendKey(bot, userId, chatId, serverName, serverApiUrl, s
         // Отправляем ключ пользователю в формате HTML
         await bot.sendMessage(chatId, `Ваш ключ для ${serverName}:\n<code>${escapedKey}</code>`, { parse_mode: 'HTML' });
         console.log(`[37] [createAndSendKey] Ключ успешно отправлен пользователю ID = ${userId}`);
-
-        // Отправляем сообщение с кнопкой для копирования
-        await bot.sendMessage(chatId, 'Скопируйте ключ целиком из сообщения выше', {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: 'Скопировать ✅', callback_data: 'copy_key' }]
-                ]
-            }
-        });
-        console.log(`[38] [createAndSendKey] Сообщение с кнопкой для копирования отправлено пользователю ID = ${userId}`);
-
-        // Уведомляем администратора о создании ключа
-        if (adminId) {
-            await bot.sendMessage(adminId, `Ключ успешно создан для пользователя ID ${userId} на сервере "${serverName}".`);
-            console.log(`[39] [createAndSendKey] Уведомление отправлено администратору ID = ${adminId}`);
-        }
 
         return { formattedKey, creationDate: currentDate };
     } catch (error) {

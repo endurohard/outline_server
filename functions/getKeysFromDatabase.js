@@ -1,7 +1,7 @@
-const ExcelJS = require('exceljs');
-const fs = require('fs');
-const path = require('path');
+const db = require('../db');
+const sendLongMessage = require('./sendLongMessage');
 
+// Функция для получения списка ключей и отправки администратору
 async function getKeysFromDatabase(bot, chatId) {
     console.log('[64] Вызов функции getKeysFromDatabase');
 
@@ -22,39 +22,26 @@ async function getKeysFromDatabase(bot, chatId) {
 
         console.log(`[67] Получено ${res.rows.length} ключей из базы данных`);
 
-        // Создание нового Excel файла
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Keys List');
+        let message = 'Список всех ключей:\n';
+        res.rows.forEach((row, index) => {
+            console.log(`[68] Обработка ключа с ID: ${row.id}, индекс в массиве: ${index}`);
+            const domain = row.key_value && row.key_value.includes('bestvpn.world')
+                ? `${row.server_name ? row.server_name.toLowerCase() : 'unknown'}.bestvpn.world`
+                : 'bestvpn.world';
+            const formattedKey = row.key_value
+                ? row.key_value.replace(/@[^:]+:/, `@${domain}:`)
+                : 'неизвестный ключ';
 
-        // Добавление заголовков
-        worksheet.columns = [
-            { header: 'ID', key: 'id', width: 10 },
-            { header: 'User ID', key: 'user_id', width: 15 },
-            { header: 'Key Value', key: 'key_value', width: 30 },
-            { header: 'Server Name', key: 'server_name', width: 20 },
-            { header: 'Creation Date', key: 'creation_date', width: 20 },
-        ];
-
-        // Добавление данных
-        res.rows.forEach(row => {
-            worksheet.addRow(row);
+            message += `ID: ${row.id}, Пользователь ID: ${row.user_id}, Ключ: ${formattedKey}, Дата создания: ${row.creation_date || 'неизвестная дата'}\n`;
         });
 
-        // Сохранение файла
-        const filePath = path.join(__dirname, 'keys_list.xlsx');
-        await workbook.xlsx.writeFile(filePath);
-        console.log('[68] Excel файл создан:', filePath);
+        console.log('[69] Отправка длинного сообщения с ключами администратору');
+        // Отправляем сообщение частями, если оно длинное
+        await sendLongMessage(bot, chatId, message);
 
-        // Отправка файла в чат
-        await bot.sendDocument(chatId, filePath);
-        console.log('[69] Файл отправлен пользователю');
-
-        // Удаление временного файла
-        fs.unlinkSync(filePath);
-        console.log('[70] Временный файл удален');
     } catch (err) {
-        console.error('[71] Ошибка при создании или отправке Excel файла:', err);
-        await bot.sendMessage(chatId, 'Произошла ошибка при отправке списка ключей.');
+        console.error('[70] Ошибка при получении списка ключей:', err);
+        await bot.sendMessage(chatId, 'Произошла ошибка при получении списка ключей.');
     }
 }
 

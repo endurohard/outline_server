@@ -4,7 +4,7 @@ const { Pool } = require('pg');
 
 const { showMainKeyboard } = require('../functions/showMainKeyboard');
 const { saveClient } = require('../functions/clientFunctions');
-const { getKeysFromDatabase } = require('../functions/getKeysFromDatabase');
+const getKeysFromDatabase = require('../functions/getKeysFromDatabase');
 const { monitorServers, getAvailableServers } = require('../functions/serverMonitor');
 const { getTemplates, showTemplatesKeyboard, addTemplate, deleteTemplate } = require('../functions/templatesFunctions');
 const { createAndSendKey } = require('../functions/keyFunctions');

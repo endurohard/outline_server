@@ -5,7 +5,8 @@
     "exceljs": "^4.4.0",
     "node-schedule": "^2.1.1",
     "node-telegram-bot-api": "^0.66.0",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "xlsx": "^0.18.5"
   },
   "name": "outline_server",
   "version": "1.0.0",
